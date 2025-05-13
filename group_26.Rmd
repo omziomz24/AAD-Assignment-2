@@ -20,6 +20,8 @@ knitr::opts_chunk$set(echo = TRUE,
 # Load relevant libraries
 library(dplyr)
 library(ggplot2)
+library(gam) # for fitting gam models
+library(caret)
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
@@ -64,6 +66,42 @@ library(ggplot2)
 
 
 ## 2.1.1 GAM vs KNN approach
+
+```{r}
+# Load data and clean NA
+data <- read.csv("Assignt2_data.csv")
+data <- na.omit(data)
+
+# Split data into training (70%) and test (30%) sets
+set.seed(26)
+n <- nrow(data)
+train_index <- sample(1:n, size=0.7*n)
+data_train <- data[train_index, ]
+data_test <- data[-train_index, ]
+
+# Fit GAM model using smoothing spline (df=4 for now) on each continuous predictor
+gam_fit <- gam(
+  medianHouseValue ~ 
+    s(longitude, df = 4) +
+    s(latitude, df = 4) +
+    s(housingMedianAge, df = 4) +
+    s(aveRooms, df = 4) +
+    s(aveBedrooms, df = 4) +
+    s(population, df = 4) +
+    s(medianIncome, df = 4),
+  data=data_train
+)
+#par(mfrow = c(1, 4))
+#plot.Gam(gam_fit, se=TRUE, col="blue")
+
+preds_gam <- predict(gam_fit, newdata = data_test)
+gam_mse <- mean((data_test$medianHouseValue - preds_gam)^2)
+gam_mse
+
+# Fit KNN model
+
+```
+
 
 ## 2.1.2 GAM vs KNN Regression Model
 
