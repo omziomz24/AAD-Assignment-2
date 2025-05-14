@@ -22,6 +22,8 @@ library(dplyr)
 library(ggplot2)
 library(gam) # for fitting gam models
 library(caret)
+library(tidyverse)
+library(mgcv)
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
@@ -67,7 +69,7 @@ library(caret)
 \end{itemize} 
 
 ## 2.1.2 GAM vs KNN Regression Model
-
+# OMAR CODE 
 ```{r}
 # Load data and clean NA
 data <- read.csv("Assignt2_data.csv")
@@ -101,6 +103,137 @@ gam_mse
 
 # Fit KNN model
 ```
+# END OMAR CODE
+
+# START SUE CODE
+```{r}
+# View(data)
+data <- read.csv("Assignt2_data.csv", header = TRUE)
+data <- na.omit(data)
+
+# separate the train and test set out 
+set.seed(1)
+train_index <- createDataPartition(data$medianHouseValue, p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data  <- data[-train_index, ]
+
+# train the knn regression model
+  # model improvements including pca and cv for k selection 
+knn_reg_model <- train(
+  medianHouseValue ~ ., 
+  data = train_data,
+  method = "knn",
+  preProcess = c("center", "scale", "pca"),  # scales & applies PCA 
+  tuneGrid = data.frame(k = 1:10),  # test k = 1 to 10
+  trControl = trainControl(method = "cv", number = 5) 
+) # takes a while to run 
+
+# best k 
+print(knn_reg_model)
+
+# KNN MSE calculation 
+knn_pred <- predict(knn_reg_model, newdata = test_data)
+knn_MSE <- mean((knn_pred - test_data$medianHouseValue)^2) 
+cat("The KNN MSE is", knn_MSE, "\n")
+```
+
+```{r}
+# GAM 
+
+# the split is the same as before 
+
+# train the GAM 
+gam_model <- gam(medianHouseValue ~ s(latitude) + s(longitude) + 
+                   s(housingMedianAge) + s(aveRooms) +
+                   s(aveBedrooms) + s(population) +
+                   s(medianIncome), data = train_data)
+
+# Calculate MSE 
+gam_pred <- predict(gam_model, newdata = test_data)
+gam_MSE <- mean((gam_pred - test_data$medianHouseValue)^2)
+cat("The GAM MSE is", gam_MSE, "\n")
+```
+
+```{r}
+# GAM improvements 
+
+gam.check(gam_model) # 
+summary(gam_model)
+
+# suspect high corr between longitude and latitude 
+ # should add interaction term 
+plot(data$longitude, data$latitude)
+
+# same thing with aveRooms and aveBedrooms 
+plot(data$aveRooms, data$aveBedrooms)
+```
+
+
+```{r} 
+# Using the predictors from Asmt1 ? 
+
+# bedroomsPerRoom
+data$bedroomsPerRoom <- data$aveBedrooms / data$aveRooms
+
+# distance to centre
+center_lat <- mean(data$latitude)
+center_lon <- mean(data$longitude)
+# data$distToCenter <- sqrt((data$latitude - center_lat)^2 + (data$longitude - center_lon)^2)
+
+# incomePerRoom
+data$incomePerRoom = data$medianIncome / data$aveRooms
+
+# Dist from LA and SF
+library(geosphere)
+la_coords <- c(-118.24, 34.05)   # (longitude, latitude)
+sf_coords <- c(-122.42, 37.77)
+distToLA <- apply(data[, c("longitude", "latitude")], 1, function(coord) {
+  distGeo(coord, la_coords) / 1000  # convert meters to km
+}) # Add distance to LA
+distToSF <- apply(data[, c("longitude", "latitude")], 1, function(coord) {
+  distGeo(coord, sf_coords) / 1000
+}) # Add distance to SF
+# Compute direction angles
+dirToLA <- atan2(data$latitude - la_coords[2], data$longitude - la_coords[1])
+dirToSF <- atan2(data$latitude - sf_coords[2], data$longitude - sf_coords[1])
+
+# City Proximity 
+cosDirToLA <- cos(dirToLA)
+sinDirToLA <- sin(dirToLA)
+cosDirToSF <- cos(dirToSF)
+sinDirToSF <- sin(dirToSF)
+data$cityProximityScore <- 1 / (1 + distToLA) + 1 / (1 + distToSF)
+
+# View(data)
+```
+
+```{r}
+train_data = data[train_index, ]
+gam_model_2 <- gam(medianHouseValue ~ s(latitude) + 
+                     s(longitude) + 
+                     s(housingMedianAge) + 
+                     s(aveRooms) +
+                     s(aveBedrooms) + 
+                     s(population) + 
+                     s(medianIncome) + 
+                     factor(oceanProximity) + 
+                     te(longitude, latitude) + 
+                     s(cityProximityScore) + 
+                     s(bedroomsPerRoom) + 
+                     s(incomePerRoom) 
+                     ,  
+                   data = train_data,
+                   select = TRUE) # to reduce overfitting 
+
+
+# Calculate MSE 
+test_data = data[-train_index, ]
+gam_pred_2 <- predict(gam_model_2, newdata = test_data)
+gam_MSE_2 <- mean((gam_pred_2 - test_data$medianHouseValue)^2)
+cat("The GAM MSE (imoroved) is", gam_MSE_2, "\n")
+```
+
+# END SUE CODE
 
 ## 2.1.3 Which model performs better?
 
@@ -159,5 +292,6 @@ This method is reasonable because:
 ## 2.3.2 test MSE of medianHousingValue using the approach
 
 ## 2.3.3 Comparison of the accuracy of this procedure to model in 2.1.3
+
 
 
