@@ -86,6 +86,7 @@ library(tidyverse)
 
 # OMAR CODE 
 ```{r}
+
 # Load data and clean NA
 data <- read.csv("Assignt2_data.csv")
 data <- na.omit(data)
@@ -121,18 +122,29 @@ gam_mse
 # END OMAR CODE
 
 # START SUE CODE
-```{r}
-# View(data)
-data <- read.csv("Assignt2_data.csv", header = TRUE)
-data <- na.omit(data)
 
+We will use the cleaned data (omitting all data point that contains "NA") instead of the original raw dataset. We split the data into a training set (80% of the original data) and a test set. 
+
+```{r}
+# load the data 
+data <- read.csv("Assignt2_data.csv")
+data <- na.omit(data)
+# View(data)
+```
+
+
+```{r}
 # separate the train and test set out 
 set.seed(1)
 train_index <- createDataPartition(data$medianHouseValue, p = 0.8, list = FALSE)
 train_data <- data[train_index, ]
 test_data  <- data[-train_index, ]
+```
 
-# train the knn regression model
+
+```{r}
+# KNN 
+
   # model improvements including pca and cv for k selection 
 knn_reg_model <- train(
   medianHouseValue ~ ., 
@@ -141,7 +153,7 @@ knn_reg_model <- train(
   preProcess = c("center", "scale", "pca"),  # scales & applies PCA 
   tuneGrid = data.frame(k = 1:10),  # test k = 1 to 10
   trControl = trainControl(method = "cv", number = 5) 
-) # takes a while to run 
+) 
 
 # best k 
 print(knn_reg_model)
@@ -248,10 +260,10 @@ gam_model_2 <- gam(medianHouseValue ~ s(latitude) +
 test_data = data[-train_index, ]
 gam_pred_2 <- predict(gam_model_2, newdata = test_data)
 gam_MSE_2 <- mean((gam_pred_2 - test_data$medianHouseValue)^2)
-cat("The GAM MSE (imoroved) is", gam_MSE_2, "\n")
+cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
 ```
 
-
+# END SUE CODE 
 
 
 
