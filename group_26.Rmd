@@ -392,8 +392,6 @@ confusionMatrix(as.factor(lda_pred), as.factor(test_data$censoring))
 cat("The LDA error rate is", round(lda_err, 4), "\n")
 ```
 
-
-
 ```{r}
 # SVM 
 
