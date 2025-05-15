@@ -309,6 +309,9 @@ This method is reasonable because:
   \item \textbf{Transparent boundary:} 
 \end{enumerate}
 
+```{r}
+# some alternatives to consider: 
+```
 
 \noindent \large \textbf{Support Vector Machine (SVM)} \normalsize
 
@@ -322,7 +325,6 @@ This method is reasonable because:
 
 
 ## 2.2.3 Which classification method performs better?
-
 
 ```{r}
 # Logistic Regression 
