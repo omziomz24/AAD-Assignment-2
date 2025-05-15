@@ -1,15 +1,8 @@
 ---
 title: "Group-26 AAD-Assignment-2"
 author: "Omar, Eloise, Alina, Sue"
+
 date: "`r Sys.Date()`"
-output:
-  pdf_document:
-    toc: true
-    toc_depth: 4
-    number_sections: false
-    fig_width: 8
-    fig_height: 6
-    keep_tex: true
   html_document:
     toc: true
     toc_depth: '4'
@@ -24,9 +17,20 @@ knitr::opts_chunk$set(echo = TRUE,
 # Load relevant libraries
 library(dplyr)
 library(ggplot2)
+
+library(gam) # for fitting gam models
+library(caret)
+library(tidyverse)
+library(mgcv)
+
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
+
+
+
+## 2.1.1 GAM vs KNN approach
+
 
 \noindent \large \textbf{GAM:} \normalsize
 
@@ -67,7 +71,8 @@ library(ggplot2)
 \end{itemize} 
 
 
-## 2.1.1 GAM vs KNN approach
+
+
 
 ## 2.1.2 GAM vs KNN Regression Model
 
@@ -75,7 +80,48 @@ library(ggplot2)
 # install.packages(c("caret", "tidyverse"))
 library(caret)
 library(tidyverse)
+```
 
+
+# OMAR CODE 
+```{r}
+# Load data and clean NA
+data <- read.csv("Assignt2_data.csv")
+data <- na.omit(data)
+
+# Split data into training (70%) and test (30%) sets
+set.seed(26)
+n <- nrow(data)
+train_index <- sample(1:n, size=0.7*n)
+data_train <- data[train_index, ]
+data_test <- data[-train_index, ]
+
+# Fit GAM model using smoothing spline (df=4 for now) on each continuous predictor
+gam_fit <- gam(
+  medianHouseValue ~ 
+    s(longitude, df = 4) +
+    s(latitude, df = 4) +
+    s(housingMedianAge, df = 4) +
+    s(aveRooms, df = 4) +
+    s(aveBedrooms, df = 4) +
+    s(population, df = 4) +
+    s(medianIncome, df = 4),
+  data=data_train
+)
+#par(mfrow = c(1, 4))
+#plot.Gam(gam_fit, se=TRUE, col="blue")
+
+preds_gam <- predict(gam_fit, newdata = data_test)
+gam_mse <- mean((data_test$medianHouseValue - preds_gam)^2)
+gam_mse
+
+# Fit KNN model
+```
+# END OMAR CODE
+
+# START SUE CODE
+```{r}
+>>>>>>> origin/main
 # View(data)
 data <- read.csv("Assignt2_data.csv", header = TRUE)
 data <- na.omit(data)
@@ -108,7 +154,6 @@ cat("The KNN MSE is", knn_MSE, "\n")
 
 ```{r}
 # GAM 
-
 
 # install.packages("mgcv")
 library(mgcv)
@@ -181,7 +226,6 @@ data$cityProximityScore <- 1 / (1 + distToLA) + 1 / (1 + distToSF)
 ```
 
 ```{r}
-library(mgcv)
 train_data = data[train_index, ]
 gam_model_2 <- gam(medianHouseValue ~ s(latitude) + 
                      s(longitude) + 
@@ -215,29 +259,69 @@ cat("The GAM MSE (imoroved) is", gam_MSE_2, "\n")
 ## 2.1.3 Which model performs better?
 
 
-
 # 2.2 Classification models
 
+## 2.2.1 New censoring boolean column
 ```{r}
+# Load original dataset and clean for NA
+data <- read.csv("Assignt2_data.csv")
+data <- na.omit(data)
 
+# Make a new column "censoring" where 1 if medianHouseValue=500,001; and 0 otherwise
+data <- data %>%
+  mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0))
+
+# what about this data$censoring <- as.integer(data$medianHouseValue==500001)
 ```
 
+## 2.2.2 Two classification methods
+!!!!!!!!!!!!!
+IM NOT TOO SURE HERE! Idk wether to use KNN classification or LDA? cause LDA is only good if n is small and the distribution of the predictor is approximately normal which it isnt most likely
+!!!!!!!!!!!!
 
-## 2.2.1 Two classification methods
+-- I think LDA and QDA were introduced because they are suitable for non-binary response? 
+-- What about TREE and SVM ? 
 
-```{r}
-# Generate a binary variable named censoring that takes value of 1 if
- # medianHouseValue = 500,001; and 0 otherwise.
+\noindent \large \textbf{Logistic Regression:} \normalsize
 
-data$censoring <- as.integer(data$medianHouseValue==500001)
-```
+\noindent In this case logistic regression can model the log-odds of hitting the $\$500,001$ cap (censoring $= 1$) as a linear function of the predictors:
+
+$$\log \frac{\mathbb{P}(\text{censor} = 1 | X)}{1 - \mathbb{P}(\text{censor} = 1 | X)} = \beta_{0} + \beta_{1} \ \text{medianIncome} + \beta_{2} \ \text{housingMedianAge} + ...$$ 
+This method is reasonable because:
+\begin{enumerate}
+  \item \textbf{Handles mixed feature types:} This method works with our continuous predictor and categorical predictors (oceanProximity)
+  \item \textbf{No strong distributional assumptions on }$\boldsymbol{X}:$\textbf{:} Some of our variables may be skewed or heteroskedastic; logistic   regression simply cares that the logit is linear in $X$, not that $X | Y$ is normal.
+  \item \textbf{Interpretable effects:} e.g. $e^{\beta_{1}}$ tells us how one unit ($\$1,000$) increases in medianIncome multiplies the odds of a      house price being censored.
+\end{enumerate}
 
 
-## 2.2.2 Suggested classifiers
+\noindent \large \textbf{Linear Discriminant Analysis (LDA):} \normalsize
 
-```{r}
-# Maybe try a couple then decide? 
-```
+\noindent In this case LDA assumes that, within each class (censor $= 0$ or $1$), the vector of predictors $($medianIncome,housingMedianAge,...$)^\top$ is drawn from a multivariate Normal with class-specific mean $\mu_{k}$ but a common covariance $\boldsymbol{\Sigma}$. It then classifies via the linear discriminant:
+
+$$\delta_k(x) = x^T \boldsymbol{\Sigma^{-1}} \mu_k - \frac{1}{2} \mu_k^T \boldsymbol{\Sigma^{-1}} \mu_k + \log \pi_k$$
+\noindent assigning each $x$ to a class with the largest $\delta_{k}$ 
+
+This method is reasonable because:
+\begin{enumerate}
+  \item \textbf{Captures covariance structure:} between some of the variables there is correlation (e.g. high-income also tends to have more bedrooms   )\textendash and that joint pattern differs between censored vs uncensored data\textenddash LDA leverages those correlations in a single rule.
+  \item \textbf{Transparent boundary:} 
+\end{enumerate}
+
+
+\section*{Logistic Regression}
+\begin{enumerate}
+\item \textbf{Ideal for binary classification problems}: Designed specifically for binary response variables, logistic regression is suitable since in this case censoring take values of either $1$ (censored) or $0$ (not censored). 
+\item \textbf{Interpretability}: It can be shown with some algebra that the logistic regression is a linear regression on the log-odds. 
+\item \textbf{Flexibility}: It estimates the probability that a given input belongs to a particular class, which also provides us with the flexibility of choosing the threshold for which optimises the testing correct rate with the assistance of ROC table.
+\end{enumerate}
+
+
+\section*{Support Vector Machine (SVM)}
+\begin{enumerate} 
+\item \textbf{Effevtive for high-dimensionality}: Since we have a large amount of features, SVM are suitable due to its kernel approach. 
+\item \textbf{Avoids ovefitting by maximising margin}: SVM focuses on maximizing the margin between the classes (i.e. it tries to be as far away as possible from the closest points in each class (called support vectors)). This reduces the model's sensitivity to small changes in data, which helps the model perform better on unseen data.
+\item \textbf{Accomodating non-linear relationships}: SVMs can be extended to handle complex decision boundaries through the kernel appraoch, allowing modeling of nonlinear relationships.
 
 
 \section*{Logistic Regression}
@@ -259,7 +343,10 @@ data$censoring <- as.integer(data$medianHouseValue==500001)
 
 
 
+
+
 ## 2.2.3 Which classification method performs better?
+
 
 ```{r}
 # Logistic Regression 
@@ -317,8 +404,6 @@ svm_model <- svm(censoring ~ longitude + latitude + medianIncome + housingMedian
                  kernel = "linear",  # Linear kernel (you can try other kernels like "radial" or "polynomial")
                  cost = 1,          # Regularization parameter (tune this)
                  scale = TRUE)      # Standardize the predictors
-
-
 ```
 
 
@@ -332,5 +417,4 @@ svm_model <- svm(censoring ~ longitude + latitude + medianIncome + housingMedian
 ## 2.3.2 test MSE of medianHousingValue using the approach
 
 ## 2.3.3 Comparison of the accuracy of this procedure to model in 2.1.3
-
 
