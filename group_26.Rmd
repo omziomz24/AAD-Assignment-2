@@ -23,6 +23,7 @@ library(caret)
 library(tidyverse)
 library(mgcv)
 
+library(MASS) #LDA 
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
@@ -366,6 +367,31 @@ logit_pred_probs <- predict(logit_fit, newdata = test_data, type = "response")
 roc_curve <- roc(test_data$censoring, logit_pred_probs)
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 ```
+
+
+```{r}
+# LDA 
+# library(MASS)
+
+lda_fit <- lda(censoring ~ longitude + 
+                 latitude + 
+                 housingMedianAge + 
+                 aveRooms + 
+                 aveBedrooms + 
+                 population + 
+                 medianIncome + 
+                 oceanProximity, 
+               data = train_data)
+
+lda_pred <- predict(lda_fit, test_data)$class 
+
+# library(caret)
+confusionMatrix(as.factor(lda_pred), as.factor(test_data$censoring))
+
+(lda_err = mean(lda_pred != test_data$censoring)) 
+cat("The LDA error rate is", round(lda_err, 4), "\n")
+```
+
 
 
 ```{r}
