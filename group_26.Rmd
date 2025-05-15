@@ -1,15 +1,12 @@
 ---
 title: "Group-26 AAD-Assignment-2"
 author: "Omar, Eloise, Alina, Sue"
-date: '`r Sys.Date()`'
-output:
-  pdf_document:
+
+date: "`r Sys.Date()`"
+  html_document:
     toc: true
-    toc_depth: 4
-    number_sections: false
-    fig_width: 8
-    fig_height: 6
-    keep_tex: true
+    toc_depth: '4'
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -20,15 +17,20 @@ knitr::opts_chunk$set(echo = TRUE,
 # Load relevant libraries
 library(dplyr)
 library(ggplot2)
+
 library(gam) # for fitting gam models
 library(caret)
 library(tidyverse)
 library(mgcv)
+
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
 
+
+
 ## 2.1.1 GAM vs KNN approach
+
 
 \noindent \large \textbf{GAM:} \normalsize
 
@@ -68,7 +70,19 @@ library(mgcv)
   \item \textbf{KNN:} can capture complex interactions, between predictors, automatically, but with eight predictors (including a categorical     one)   it may run into high-dimensionality issues, making distance-based averaging unstable and slow.
 \end{itemize} 
 
+
+
+
+
 ## 2.1.2 GAM vs KNN Regression Model
+
+```{r}
+# install.packages(c("caret", "tidyverse"))
+library(caret)
+library(tidyverse)
+```
+
+
 # OMAR CODE 
 ```{r}
 # Load data and clean NA
@@ -107,6 +121,7 @@ gam_mse
 
 # START SUE CODE
 ```{r}
+>>>>>>> origin/main
 # View(data)
 data <- read.csv("Assignt2_data.csv", header = TRUE)
 data <- na.omit(data)
@@ -139,6 +154,9 @@ cat("The KNN MSE is", knn_MSE, "\n")
 
 ```{r}
 # GAM 
+
+# install.packages("mgcv")
+library(mgcv)
 
 # the split is the same as before 
 
@@ -233,9 +251,13 @@ gam_MSE_2 <- mean((gam_pred_2 - test_data$medianHouseValue)^2)
 cat("The GAM MSE (imoroved) is", gam_MSE_2, "\n")
 ```
 
-# END SUE CODE
+
+
+
+
 
 ## 2.1.3 Which model performs better?
+
 
 # 2.2 Classification models
 
@@ -248,12 +270,17 @@ data <- na.omit(data)
 # Make a new column "censoring" where 1 if medianHouseValue=500,001; and 0 otherwise
 data <- data %>%
   mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0))
+
+# what about this data$censoring <- as.integer(data$medianHouseValue==500001)
 ```
 
 ## 2.2.2 Two classification methods
 !!!!!!!!!!!!!
 IM NOT TOO SURE HERE! Idk wether to use KNN classification or LDA? cause LDA is only good if n is small and the distribution of the predictor is approximately normal which it isnt most likely
 !!!!!!!!!!!!
+
+-- I think LDA and QDA were introduced because they are suitable for non-binary response? 
+-- What about TREE and SVM ? 
 
 \noindent \large \textbf{Logistic Regression:} \normalsize
 
@@ -282,8 +309,92 @@ This method is reasonable because:
 \end{enumerate}
 
 
+\section*{Logistic Regression}
+\begin{enumerate}
+\item \textbf{Ideal for binary classification problems}: Designed specifically for binary response variables, logistic regression is suitable since in this case censoring take values of either $1$ (censored) or $0$ (not censored). 
+\item \textbf{Interpretability}: It can be shown with some algebra that the logistic regression is a linear regression on the log-odds. 
+\item \textbf{Flexibility}: It estimates the probability that a given input belongs to a particular class, which also provides us with the flexibility of choosing the threshold for which optimises the testing correct rate with the assistance of ROC table.
+\end{enumerate}
+
+
+\section*{Support Vector Machine (SVM)}
+\begin{enumerate} 
+\item \textbf{Effevtive for high-dimensionality}: Since we have a large amount of features, SVM are suitable due to its kernel approach. 
+\item \textbf{Avoids ovefitting by maximising margin}: SVM focuses on maximizing the margin between the classes (i.e. it tries to be as far away as possible from the closest points in each class (called support vectors)). This reduces the model's sensitivity to small changes in data, which helps the model perform better on unseen data.
+\item \textbf{Accomodating non-linear relationships}: SVMs can be extended to handle complex decision boundaries through the kernel appraoch, allowing modeling of nonlinear relationships.
+
+
+
+
+
+
+
+
 
 ## 2.2.3 Which classification method performs better?
+
+
+```{r}
+# Logistic Regression 
+
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ] 
+
+logit_fit <- glm(censoring ~ longitude + 
+                   latitude + 
+                   medianIncome + 
+                   housingMedianAge + 
+                   oceanProximity + 
+                   aveRooms + 
+                   aveBedrooms,
+                 data = train_data, 
+                 family = binomial)
+
+logit_pred <- as.numeric(predict(logit_fit, 
+                      newdata = test_data, 
+                      type = "response") > 0.5) # use 0.5 for now 
+
+error_rate <- mean(logit_pred != test_data$censoring)
+
+print(paste("Logistic Regression Prediction Error Rate:", round(error_rate, 3)))
+# wait this is extremely low - worried about data leakage need to come back !!! \
+
+
+library(caret)
+# Confusion matrix 
+confusion_matrix <- confusionMatrix(as.factor(logit_pred), as.factor(test_data$censoring))
+print(confusion_matrix)
+
+# ROC 
+# install.packages("caret")
+library(caret)
+# install.packages("pROC")
+library(pROC)
+logit_pred_probs <- predict(logit_fit, newdata = test_data, type = "response")
+roc_curve <- roc(test_data$censoring, logit_pred_probs)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+```
+
+
+```{r}
+# SVM 
+
+# install.packages("e1071")
+library(e1071)
+train_data <- data[train_index, ] # in case any modification of the data set needed gotta rerun this 
+test_data <- data[-train_index, ]
+
+svm_model <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
+                   oceanProximity + aveRooms + aveBedrooms, 
+                 data = train_data, 
+                 kernel = "linear",  # Linear kernel (you can try other kernels like "radial" or "polynomial")
+                 cost = 1,          # Regularization parameter (tune this)
+                 scale = TRUE)      # Standardize the predictors
+```
+
+
+
+
 
 # 2.3 A hybrid approach
 
@@ -292,6 +403,4 @@ This method is reasonable because:
 ## 2.3.2 test MSE of medianHousingValue using the approach
 
 ## 2.3.3 Comparison of the accuracy of this procedure to model in 2.1.3
-
-
 
