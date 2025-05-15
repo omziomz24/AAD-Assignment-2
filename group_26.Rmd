@@ -22,9 +22,13 @@ library(dplyr)
 library(ggplot2)
 library(gam) # for fitting gam models
 library(caret)
+library(tidyverse)
+library(mgcv)
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
+
+## 2.1.1 GAM vs KNN approach
 
 \noindent \large \textbf{GAM:} \normalsize
 
@@ -64,9 +68,8 @@ library(caret)
   \item \textbf{KNN:} can capture complex interactions, between predictors, automatically, but with eight predictors (including a categorical     one)   it may run into high-dimensionality issues, making distance-based averaging unstable and slow.
 \end{itemize} 
 
-
-## 2.1.1 GAM vs KNN approach
-
+## 2.1.2 GAM vs KNN Regression Model
+# OMAR CODE 
 ```{r}
 # Load data and clean NA
 data <- read.csv("Assignt2_data.csv")
@@ -99,19 +102,186 @@ gam_mse <- mean((data_test$medianHouseValue - preds_gam)^2)
 gam_mse
 
 # Fit KNN model
+```
+# END OMAR CODE
 
+# START SUE CODE
+```{r}
+# View(data)
+data <- read.csv("Assignt2_data.csv", header = TRUE)
+data <- na.omit(data)
+
+# separate the train and test set out 
+set.seed(1)
+train_index <- createDataPartition(data$medianHouseValue, p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data  <- data[-train_index, ]
+
+# train the knn regression model
+  # model improvements including pca and cv for k selection 
+knn_reg_model <- train(
+  medianHouseValue ~ ., 
+  data = train_data,
+  method = "knn",
+  preProcess = c("center", "scale", "pca"),  # scales & applies PCA 
+  tuneGrid = data.frame(k = 1:10),  # test k = 1 to 10
+  trControl = trainControl(method = "cv", number = 5) 
+) # takes a while to run 
+
+# best k 
+print(knn_reg_model)
+
+# KNN MSE calculation 
+knn_pred <- predict(knn_reg_model, newdata = test_data)
+knn_MSE <- mean((knn_pred - test_data$medianHouseValue)^2) 
+cat("The KNN MSE is", knn_MSE, "\n")
+```
+
+```{r}
+# GAM 
+
+# the split is the same as before 
+
+# train the GAM 
+gam_model <- gam(medianHouseValue ~ s(latitude) + s(longitude) + 
+                   s(housingMedianAge) + s(aveRooms) +
+                   s(aveBedrooms) + s(population) +
+                   s(medianIncome), data = train_data)
+
+# Calculate MSE 
+gam_pred <- predict(gam_model, newdata = test_data)
+gam_MSE <- mean((gam_pred - test_data$medianHouseValue)^2)
+cat("The GAM MSE is", gam_MSE, "\n")
+```
+
+```{r}
+# GAM improvements 
+
+gam.check(gam_model) # 
+summary(gam_model)
+
+# suspect high corr between longitude and latitude 
+ # should add interaction term 
+plot(data$longitude, data$latitude)
+
+# same thing with aveRooms and aveBedrooms 
+plot(data$aveRooms, data$aveBedrooms)
 ```
 
 
-## 2.1.2 GAM vs KNN Regression Model
+```{r} 
+# Using the predictors from Asmt1 ? 
+
+# bedroomsPerRoom
+data$bedroomsPerRoom <- data$aveBedrooms / data$aveRooms
+
+# distance to centre
+center_lat <- mean(data$latitude)
+center_lon <- mean(data$longitude)
+# data$distToCenter <- sqrt((data$latitude - center_lat)^2 + (data$longitude - center_lon)^2)
+
+# incomePerRoom
+data$incomePerRoom = data$medianIncome / data$aveRooms
+
+# Dist from LA and SF
+library(geosphere)
+la_coords <- c(-118.24, 34.05)   # (longitude, latitude)
+sf_coords <- c(-122.42, 37.77)
+distToLA <- apply(data[, c("longitude", "latitude")], 1, function(coord) {
+  distGeo(coord, la_coords) / 1000  # convert meters to km
+}) # Add distance to LA
+distToSF <- apply(data[, c("longitude", "latitude")], 1, function(coord) {
+  distGeo(coord, sf_coords) / 1000
+}) # Add distance to SF
+# Compute direction angles
+dirToLA <- atan2(data$latitude - la_coords[2], data$longitude - la_coords[1])
+dirToSF <- atan2(data$latitude - sf_coords[2], data$longitude - sf_coords[1])
+
+# City Proximity 
+cosDirToLA <- cos(dirToLA)
+sinDirToLA <- sin(dirToLA)
+cosDirToSF <- cos(dirToSF)
+sinDirToSF <- sin(dirToSF)
+data$cityProximityScore <- 1 / (1 + distToLA) + 1 / (1 + distToSF)
+
+# View(data)
+```
+
+```{r}
+train_data = data[train_index, ]
+gam_model_2 <- gam(medianHouseValue ~ s(latitude) + 
+                     s(longitude) + 
+                     s(housingMedianAge) + 
+                     s(aveRooms) +
+                     s(aveBedrooms) + 
+                     s(population) + 
+                     s(medianIncome) + 
+                     factor(oceanProximity) + 
+                     te(longitude, latitude) + 
+                     s(cityProximityScore) + 
+                     s(bedroomsPerRoom) + 
+                     s(incomePerRoom) 
+                     ,  
+                   data = train_data,
+                   select = TRUE) # to reduce overfitting 
+
+
+# Calculate MSE 
+test_data = data[-train_index, ]
+gam_pred_2 <- predict(gam_model_2, newdata = test_data)
+gam_MSE_2 <- mean((gam_pred_2 - test_data$medianHouseValue)^2)
+cat("The GAM MSE (imoroved) is", gam_MSE_2, "\n")
+```
+
+# END SUE CODE
 
 ## 2.1.3 Which model performs better?
 
 # 2.2 Classification models
 
-## 2.2.1 Two classification methods
+## 2.2.1 New censoring boolean column
+```{r}
+# Load original dataset and clean for NA
+data <- read.csv("Assignt2_data.csv")
+data <- na.omit(data)
 
-## 2.2.2 Suggested classifiers
+# Make a new column "censoring" where 1 if medianHouseValue=500,001; and 0 otherwise
+data <- data %>%
+  mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0))
+```
+
+## 2.2.2 Two classification methods
+!!!!!!!!!!!!!
+IM NOT TOO SURE HERE! Idk wether to use KNN classification or LDA? cause LDA is only good if n is small and the distribution of the predictor is approximately normal which it isnt most likely
+!!!!!!!!!!!!
+
+\noindent \large \textbf{Logistic Regression:} \normalsize
+
+\noindent In this case logistic regression can model the log-odds of hitting the $\$500,001$ cap (censoring $= 1$) as a linear function of the predictors:
+
+$$\log \frac{\mathbb{P}(\text{censor} = 1 | X)}{1 - \mathbb{P}(\text{censor} = 1 | X)} = \beta_{0} + \beta_{1} \ \text{medianIncome} + \beta_{2} \ \text{housingMedianAge} + ...$$ 
+This method is reasonable because:
+\begin{enumerate}
+  \item \textbf{Handles mixed feature types:} This method works with our continuous predictor and categorical predictors (oceanProximity)
+  \item \textbf{No strong distributional assumptions on }$\boldsymbol{X}:$\textbf{:} Some of our variables may be skewed or heteroskedastic; logistic   regression simply cares that the logit is linear in $X$, not that $X | Y$ is normal.
+  \item \textbf{Interpretable effects:} e.g. $e^{\beta_{1}}$ tells us how one unit ($\$1,000$) increases in medianIncome multiplies the odds of a      house price being censored.
+\end{enumerate}
+
+
+\noindent \large \textbf{Linear Discriminant Analysis (LDA):} \normalsize
+
+\noindent In this case LDA assumes that, within each class (censor $= 0$ or $1$), the vector of predictors $($medianIncome,housingMedianAge,...$)^\top$ is drawn from a multivariate Normal with class-specific mean $\mu_{k}$ but a common covariance $\boldsymbol{\Sigma}$. It then classifies via the linear discriminant:
+
+$$\delta_k(x) = x^T \boldsymbol{\Sigma^{-1}} \mu_k - \frac{1}{2} \mu_k^T \boldsymbol{\Sigma^{-1}} \mu_k + \log \pi_k$$
+\noindent assigning each $x$ to a class with the largest $\delta_{k}$ 
+
+This method is reasonable because:
+\begin{enumerate}
+  \item \textbf{Captures covariance structure:} between some of the variables there is correlation (e.g. high-income also tends to have more bedrooms   )\textendash and that joint pattern differs between censored vs uncensored data\textenddash LDA leverages those correlations in a single rule.
+  \item \textbf{Transparent boundary:} 
+\end{enumerate}
+
+
 
 ## 2.2.3 Which classification method performs better?
 
@@ -122,5 +292,6 @@ gam_mse
 ## 2.3.2 test MSE of medianHousingValue using the approach
 
 ## 2.3.3 Comparison of the accuracy of this procedure to model in 2.1.3
+
 
 
