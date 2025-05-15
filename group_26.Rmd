@@ -324,20 +324,6 @@ This method is reasonable because:
 \item \textbf{Accomodating non-linear relationships}: SVMs can be extended to handle complex decision boundaries through the kernel appraoch, allowing modeling of nonlinear relationships.
 
 
-\section*{Logistic Regression}
-\begin{enumerate}
-\item \textbf{Ideal for binary classification problems}: Designed specifically for binary response variables, logistic regression is suitable since in this case censoring take values of either $1$ (censored) or $0$ (not censored). 
-\item \textbf{Interpretability}: It can be shown with some algebra that the logistic regression is a linear regression on the log-odds. 
-\item \textbf{Flexibility}: It estimates the probability that a given input belongs to a particular class, which also provides us with the flexibility of choosing the threshold for which optimises the testing correct rate with the assistance of ROC table.
-\end{enumerate}
-
-
-\section*{Support Vector Machine (SVM)}
-\begin{enumerate} 
-\item \textbf{Effevtive for high-dimensionality}: Since we have a large amount of features, SVM are suitable due to its kernel approach. 
-\item \textbf{Avoids ovefitting by maximising margin}: SVM focuses on maximizing the margin between the classes (i.e. it tries to be as far away as possible from the closest points in each class (called support vectors)). This reduces the model's sensitivity to small changes in data, which helps the model perform better on unseen data.
-\item \textbf{Accomodating non-linear relationships}: SVMs can be extended to handle complex decision boundaries through the kernel appraoch, allowing modeling of nonlinear relationships.
-
 
 
 
