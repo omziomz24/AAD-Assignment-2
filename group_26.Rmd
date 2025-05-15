@@ -304,6 +304,7 @@ IM NOT TOO SURE HERE! Idk wether to use KNN classification or LDA? cause LDA is 
 
 -- I think LDA and QDA were introduced because they are suitable for non-binary response? 
 -- What about TREE and SVM ? 
+-- OK maybe not TREE cuz it usually doesnt do well with the predictions 
 
 \noindent \large \textbf{Logistic Regression:} \normalsize
 
