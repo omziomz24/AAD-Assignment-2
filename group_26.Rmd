@@ -197,7 +197,7 @@ plot(data$longitude, data$latitude)
 # same thing with aveRooms and aveBedrooms 
 plot(data$aveRooms, data$aveBedrooms)
 ```
-
+###### some justifications required: 
 
 ```{r} 
 # Using the predictors from Asmt1 ? 
@@ -266,9 +266,20 @@ cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
 # END SUE CODE 
 
 
-
-
 ## 2.1.3 Which model performs better?
+
+```{r}
+# if any improvements to 2.1.2 occurs and changes the result between KNN and GAM, we need to update the following analysis.
+```
+
+In this regression problem, even after improvements, the KNN model outperforms the GAM model as shown by its lower test MSE (approximately 3.91 billion versus 4.10 billion). This indicates that KNN better captures the complex, nonlinear relationships in the data.
+
+KNN does not seem to suffer significantly from the curse of dimensionality here. Its ability to accommodate complex relationships is enhanced by integrating PCA, which effectively reduces bias with only a small increase in variance. This balance allows KNN to generalize well on the test data after tuning the number of neighbors.
+
+For the GAM model, attempts to incorporate additional variables (e.g. cityProximityScore) that potentially capture more relevant information have resulted in only marginal improvements in MSE. This suggests that the additive smooth terms in GAM are still too restrictive and unable to fully model the underlying data complexity, limiting its predictive power.
+
+Overall, these results reflect the bias-variance trade-off: KNN achieves lower bias through flexible local fitting and dimensionality reduction, while GAM’s higher bias—due to its smoother additive assumptions—limits its performance despite generally lower variance.
+
 
 
 # 2.2 Classification models
