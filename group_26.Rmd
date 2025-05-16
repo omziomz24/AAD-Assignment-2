@@ -23,7 +23,9 @@ library(caret)
 library(tidyverse)
 library(mgcv)
 
-library(MASS) #LDA 
+library(MASS) # for LDA 
+
+library(class) # for knn() 
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
@@ -141,9 +143,8 @@ train_data <- data[train_index, ]
 test_data  <- data[-train_index, ]
 ```
 
-
 ```{r}
-# KNN 
+# KNN using train() in caret package 
 
   # model improvements including pca and cv for k selection 
 knn_reg_model <- train(
@@ -163,6 +164,9 @@ knn_pred <- predict(knn_reg_model, newdata = test_data)
 knn_MSE <- mean((knn_pred - test_data$medianHouseValue)^2) 
 cat("The KNN MSE is", knn_MSE, "\n")
 ```
+
+
+
 
 ```{r}
 # GAM 
@@ -345,6 +349,10 @@ This method is reasonable because:
 \item \textbf{Avoids ovefitting by maximising margin}: SVM focuses on maximizing the margin between the classes (i.e. it tries to be as far away as possible from the closest points in each class (called support vectors)). This reduces the model's sensitivity to small changes in data, which helps the model perform better on unseen data.
 \item \textbf{Accomodating non-linear relationships}: SVMs can be extended to handle complex decision boundaries through the kernel appraoch, allowing modeling of nonlinear relationships.
 
+\noindent \large \textbf{Naïve Bayes} \normalsize
+
+
+
 
 
 
@@ -374,8 +382,6 @@ logit_pred <- as.numeric(predict(logit_fit,
 error_rate <- mean(logit_pred != test_data$censoring)
 
 print(paste("Logistic Regression Prediction Error Rate:", round(error_rate, 3)))
-# wait this is extremely low - worried about data leakage need to come back !!! \
-
 
 library(caret)
 # Confusion matrix 
@@ -421,19 +427,83 @@ cat("The LDA error rate is", round(lda_err, 4), "\n")
 
 # install.packages("e1071")
 library(e1071)
-train_data <- data[train_index, ] # in case any modification of the data set needed gotta rerun this 
+train_data <- data[train_index, ] 
+# in case any modification of the data set needed gotta rerun this 
 test_data <- data[-train_index, ]
 
-svm_model <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
+svm_model_1 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
                    oceanProximity + aveRooms + aveBedrooms, 
                  data = train_data, 
-                 kernel = "linear",  # Linear kernel (you can try other kernels like "radial" or "polynomial")
+                 kernel = "linear",  # try radial later 
                  cost = 1,          # Regularization parameter (tune this)
                  scale = TRUE)      # Standardize the predictors
+
+svm_model_2 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
+                   oceanProximity + aveRooms + aveBedrooms, 
+                 data = train_data, 
+                 kernel = "radial",  
+                 cost = 1,        # Regularization parameter (tune this)
+                 scale = TRUE)  
+
+svm_model_2 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
+                   oceanProximity + aveRooms + aveBedrooms, 
+                 data = train_data, 
+                 kernel = "polinomial",  
+                 cost = 1,        # Regularization parameter (tune this)
+                 scale = TRUE)  
 ```
 
 
+```{r}
+svm_fits <- list(
+  "Radial" = svm(censoring ~ 
+                   longitude + latitude + medianIncome + 
+                   housingMedianAge +  aveRooms + aveBedrooms, 
+                 data = data[train_index, ],
+                 kernel = "radial"), 
+  "Polynomial" = svm(censoring ~ 
+                   longitude + latitude + medianIncome + 
+                   housingMedianAge +  aveRooms + aveBedrooms, 
+                 data = data[train_index, ],
+                 kernel = "polynomial", degree = 2), 
+  "Linear" = svm(censoring ~ 
+                   longitude + latitude + medianIncome + 
+                   housingMedianAge + aveRooms + aveBedrooms, 
+                 data = data[train_index, ],
+                 kernel = "linear"))
 
+err <- function(model, data) {
+  out <- table(predict(model, data), data$censoring)
+  (out[1, 2] + out[2, 1]) / sum(out)
+}
+
+plot(svm_fits[[1]], datap[train_index, ])
+```
+
+
+```{r}
+# Naive Bayes 
+
+nb_fit <- naiveBayes(censoring ~ longitude + 
+                       latitude + 
+                       housingMedianAge + 
+                       aveRooms + 
+                       aveBedrooms + 
+                       population + 
+                       medianIncome, 
+                     data = data[train_index, ])
+
+nb_pred <- predict(nb_fit, data[-train_index, ], type = "class")
+
+# Confusion table 
+(nb_t <- table(nb_pred, data[-train_index, ]$censoring))
+
+(nb_error = 1 - sum(diag(nb_t)) / sum(nb_t))
+cat("The Naive Bayes error rate is", round(nb_error, 4), "\n")
+
+# not doing as good as logistic 
+
+```
 
 
 # 2.3 A hybrid approach
