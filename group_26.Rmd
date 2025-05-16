@@ -17,15 +17,13 @@ knitr::opts_chunk$set(echo = TRUE,
 # Load relevant libraries
 library(dplyr)
 library(ggplot2)
-
-library(gam) # for fitting gam models
+#library(gam)
 library(caret)
 library(tidyverse)
-library(mgcv)
-
+library(mgcv) # for GAM
 library(MASS) # for LDA 
-
-library(class) # for knn() 
+library(class) # for KNN
+library(geosphere)
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
@@ -79,51 +77,7 @@ library(class) # for knn()
 
 ## 2.1.2 GAM vs KNN Regression Model
 
-```{r}
-# install.packages(c("caret", "tidyverse"))
-library(caret)
-library(tidyverse)
-```
 
-
-# OMAR CODE 
-```{r}
-
-# Load data and clean NA
-data <- read.csv("Assignt2_data.csv")
-data <- na.omit(data)
-
-# Split data into training (70%) and test (30%) sets
-set.seed(26)
-n <- nrow(data)
-train_index <- sample(1:n, size=0.7*n)
-data_train <- data[train_index, ]
-data_test <- data[-train_index, ]
-
-# Fit GAM model using smoothing spline (df=4 for now) on each continuous predictor
-gam_fit <- gam(
-  medianHouseValue ~ 
-    s(longitude, df = 4) +
-    s(latitude, df = 4) +
-    s(housingMedianAge, df = 4) +
-    s(aveRooms, df = 4) +
-    s(aveBedrooms, df = 4) +
-    s(population, df = 4) +
-    s(medianIncome, df = 4),
-  data=data_train
-)
-#par(mfrow = c(1, 4))
-#plot.Gam(gam_fit, se=TRUE, col="blue")
-
-preds_gam <- predict(gam_fit, newdata = data_test)
-gam_mse <- mean((data_test$medianHouseValue - preds_gam)^2)
-gam_mse
-
-# Fit KNN model
-```
-# END OMAR CODE
-
-# START SUE CODE
 
 We will use the cleaned data (omitting all data point that contains "NA") instead of the original raw dataset. We split the data into a training set (80% of the original data) and a test set. 
 
@@ -143,49 +97,140 @@ train_data <- data[train_index, ]
 test_data  <- data[-train_index, ]
 ```
 
-```{r}
-# KNN using train() in caret package 
 
-  # model improvements including pca and cv for k selection 
-knn_reg_model <- train(
+```{r}
+# Basic KNN
+knn_reg_model1 <- train(
   medianHouseValue ~ ., 
   data = train_data,
   method = "knn",
-  preProcess = c("center", "scale", "pca"),  # scales & applies PCA 
+  preProcess = c("center", "scale"),
   tuneGrid = data.frame(k = 1:10),  # test k = 1 to 10
   trControl = trainControl(method = "cv", number = 5) 
 ) 
 
 # best k 
-print(knn_reg_model)
+print(knn_reg_model1)
 
 # KNN MSE calculation 
-knn_pred <- predict(knn_reg_model, newdata = test_data)
-knn_MSE <- mean((knn_pred - test_data$medianHouseValue)^2) 
-cat("The KNN MSE is", knn_MSE, "\n")
+knn_pred1 <- predict(knn_reg_model1, newdata = test_data)
+knn_MSE1 <- mean((knn_pred1 - test_data$medianHouseValue)^2) 
+cat("The KNN MSE is", knn_MSE1, "\n")
+
+```
+### Model Improvements
+
+```{r}
+# Using the predictors from Asmt1 ? 
+data_imp <- read.csv("Assignt2_data.csv")
+data_imp <- na.omit(data_imp)
+
+# bedroomsPerRoom
+data_imp$bedroomsPerRoom <- data_imp$aveBedrooms / data_imp$aveRooms
+
+
+# incomePerRoom
+data_imp$incomePerRoom = data_imp$medianIncome / data_imp$aveRooms
+
+# Compute distances
+la_coords <- c(-118.24, 34.05)   # (longitude, latitude)
+sf_coords <- c(-122.42, 37.77)
+
+data_imp$distToLA <- apply(data_imp[, c("longitude", "latitude")], 1, function(coord) {
+  distGeo(coord, la_coords) / 1000
+})
+data_imp$distToSF <- apply(data_imp[, c("longitude", "latitude")], 1, function(coord) {
+  distGeo(coord, sf_coords) / 1000
+})
+
+# Compute directions
+data_imp$dirToLA <- atan2(data_imp$latitude - la_coords[2], data_imp$longitude - la_coords[1])
+data_imp$dirToSF <- atan2(data_imp$latitude - sf_coords[2], data_imp$longitude - sf_coords[1])
+
+# Cosine and sine of direction
+data_imp$cosDirToLA <- cos(data_imp$dirToLA)
+data_imp$sinDirToLA <- sin(data_imp$dirToLA)
+data_imp$cosDirToSF <- cos(data_imp$dirToSF)
+data_imp$sinDirToSF <- sin(data_imp$dirToSF)
+data_imp$dirToLA <- NULL
+data_imp$dirToSF <- NULL
+
+# Composite proximity score
+data_imp$cityProximityScore <- 1 / (1 + data_imp$distToLA) + 1 / (1 + data_imp$distToSF)
+
+# Add these to test and train
+set.seed(1)
+train_data_imp <- data_imp[train_index, ]
+test_data_imp  <- data_imp[-train_index, ]
+
+
+
+
 ```
 
 
 
+```{r}
+# with model improvements
+# Hot encoding the variables
+
+# Convert oceanProximity to factor (if not already)
+train_data_imp$oceanProximity <- as.factor(train_data_imp$oceanProximity)
+test_data_imp$oceanProximity <- as.factor(test_data_imp$oceanProximity)
+
+# One-hot encode using dummyVars
+dummies <- dummyVars(~ ., data = train_data_imp)
+train_data_encoded <- predict(dummies, newdata = train_data_imp)
+test_data_encoded <- predict(dummies, newdata = test_data_imp)
+
+# Convert to data frame
+train_data_encoded <- as.data.frame(train_data_encoded)
+test_data_encoded <- as.data.frame(test_data_encoded)
+
+
+
+knn_reg_model2 <- train(
+  medianHouseValue ~ ., 
+  data = train_data_encoded,
+  method = "knn",
+  preProcess = c("center", "scale"),
+  tuneGrid = data.frame(k = 1:15),  # test k = 1 to 15
+  trControl = trainControl(method = "cv", number = 5) 
+) 
+
+# best k 
+print(knn_reg_model2)
+
+# KNN MSE calculation 
+knn_pred2 <- predict(knn_reg_model2, newdata = test_data_encoded)
+knn_MSE2 <- mean((knn_pred2 - test_data_encoded$medianHouseValue)^2) 
+cat("The KNN MSE (improved) is", knn_MSE2, "\n")
+
+
+#The KNN MSE is 3697939911 with out encoding
+#With encoding  3694531899
+#PCA makes it worse in general
+#improve when tested more k 3650562433
+# best now is: 2999761722 
+```
+
 
 ```{r}
 # GAM 
-
-# install.packages("mgcv")
-library(mgcv)
-
 # the split is the same as before 
 
 # train the GAM 
-gam_model <- gam(medianHouseValue ~ s(latitude) + s(longitude) + 
+gam_model <- mgcv::gam(medianHouseValue ~ s(latitude) + s(longitude) + 
                    s(housingMedianAge) + s(aveRooms) +
                    s(aveBedrooms) + s(population) +
-                   s(medianIncome), data = train_data)
+                   s(medianIncome) + factor(oceanProximity), data = train_data)
 
 # Calculate MSE 
 gam_pred <- predict(gam_model, newdata = test_data)
 gam_MSE <- mean((gam_pred - test_data$medianHouseValue)^2)
 cat("The GAM MSE is", gam_MSE, "\n")
+
+#4258008383 
 ```
 
 ```{r}
@@ -203,68 +248,36 @@ plot(data$aveRooms, data$aveBedrooms)
 ```
 ###### some justifications required: 
 
-```{r} 
-# Using the predictors from Asmt1 ? 
-
-# bedroomsPerRoom
-data$bedroomsPerRoom <- data$aveBedrooms / data$aveRooms
-
-# distance to centre
-center_lat <- mean(data$latitude)
-center_lon <- mean(data$longitude)
-# data$distToCenter <- sqrt((data$latitude - center_lat)^2 + (data$longitude - center_lon)^2)
-
-# incomePerRoom
-data$incomePerRoom = data$medianIncome / data$aveRooms
-
-# Dist from LA and SF
-library(geosphere)
-la_coords <- c(-118.24, 34.05)   # (longitude, latitude)
-sf_coords <- c(-122.42, 37.77)
-distToLA <- apply(data[, c("longitude", "latitude")], 1, function(coord) {
-  distGeo(coord, la_coords) / 1000  # convert meters to km
-}) # Add distance to LA
-distToSF <- apply(data[, c("longitude", "latitude")], 1, function(coord) {
-  distGeo(coord, sf_coords) / 1000
-}) # Add distance to SF
-# Compute direction angles
-dirToLA <- atan2(data$latitude - la_coords[2], data$longitude - la_coords[1])
-dirToSF <- atan2(data$latitude - sf_coords[2], data$longitude - sf_coords[1])
-
-# City Proximity 
-cosDirToLA <- cos(dirToLA)
-sinDirToLA <- sin(dirToLA)
-cosDirToSF <- cos(dirToSF)
-sinDirToSF <- sin(dirToSF)
-data$cityProximityScore <- 1 / (1 + distToLA) + 1 / (1 + distToSF)
-
-# View(data)
-```
-
 ```{r}
-train_data = data[train_index, ]
-gam_model_2 <- gam(medianHouseValue ~ s(latitude) + 
-                     s(longitude) + 
+# improvements
+train_data_imp = data_imp[train_index, ]
+gam_model_2 <- mgcv::gam(medianHouseValue ~ 
                      s(housingMedianAge) + 
                      s(aveRooms) +
                      s(aveBedrooms) + 
                      s(population) + 
-                     s(medianIncome) + 
-                     factor(oceanProximity) + 
-                     te(longitude, latitude) + 
+                     s(medianIncome) +
+                     te(longitude, latitude) +
                      s(cityProximityScore) + 
                      s(bedroomsPerRoom) + 
-                     s(incomePerRoom) 
-                     ,  
-                   data = train_data,
+                     s(incomePerRoom) +
+                     s(distToSF) +
+                     s(distToLA) +
+                     s(cosDirToLA) +
+                     s(cosDirToSF) +
+                     s(sinDirToLA) +
+                     s(sinDirToSF),  
+                   data = train_data_imp,
                    select = TRUE) # to reduce overfitting 
 
 
 # Calculate MSE 
-test_data = data[-train_index, ]
-gam_pred_2 <- predict(gam_model_2, newdata = test_data)
-gam_MSE_2 <- mean((gam_pred_2 - test_data$medianHouseValue)^2)
+test_data_imp = data_imp[-train_index, ]
+gam_pred_2 <- predict(gam_model_2, newdata = test_data_imp)
+gam_MSE_2 <- mean((gam_pred_2 - test_data_imp$medianHouseValue)^2)
 cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
+
+#3386284239 
 ```
 
 # END SUE CODE 
