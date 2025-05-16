@@ -481,9 +481,6 @@ plot(svm_fits[[1]], datap[train_index, ])
 ```
 
 
-
-
-
 ```{r}
 # Naive Bayes 
 
