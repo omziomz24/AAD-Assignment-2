@@ -85,7 +85,7 @@ We will use the cleaned data (omitting all data point that contains "NA") instea
 # load the data 
 data <- read.csv("Assignt2_data.csv")
 data <- na.omit(data)
-# View(data)
+View(data)
 ```
 
 
@@ -115,9 +115,31 @@ print(knn_reg_model1)
 # KNN MSE calculation 
 knn_pred1 <- predict(knn_reg_model1, newdata = test_data)
 knn_MSE1 <- mean((knn_pred1 - test_data$medianHouseValue)^2) 
-cat("The KNN MSE is", knn_MSE1, "\n")
+cat("The KNN MSE is", knn_MSE1)
 
 ```
+
+#ALINA - knn test; bigger range for k -> k=11 not big difference
+```{r}
+# Basic KNN
+knn_reg_model1 <- train(
+  medianHouseValue ~ ., 
+  data = train_data,
+  method = "knn",
+  preProcess = c("center", "scale"),
+  tuneGrid = data.frame(k = 1:20),  # test k = 1 to 10
+  trControl = trainControl(method = "cv", number = 5) 
+) 
+
+# best k 
+print(knn_reg_model1)
+
+# KNN MSE calculation 
+knn_pred1 <- predict(knn_reg_model1, newdata = test_data)
+knn_MSE1 <- mean((knn_pred1 - test_data$medianHouseValue)^2) 
+cat("The KNN MSE is", knn_MSE1)
+```
+
 ### Model Improvements
 
 ```{r}
