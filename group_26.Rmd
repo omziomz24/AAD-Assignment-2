@@ -100,7 +100,7 @@ test_data  <- data[-train_index, ]
 
 ```{r}
 # Basic KNN
-knn_reg_model1 <- train(
+knn_reg_model_1 <- train(
   medianHouseValue ~ ., 
   data = train_data,
   method = "knn",
@@ -110,12 +110,12 @@ knn_reg_model1 <- train(
 ) 
 
 # best k 
-print(knn_reg_model1)
+print(knn_reg_model_1)
 
 # KNN MSE calculation 
-knn_pred1 <- predict(knn_reg_model1, newdata = test_data)
-knn_MSE1 <- mean((knn_pred1 - test_data$medianHouseValue)^2) 
-cat("The KNN MSE is", knn_MSE1, "\n")
+knn_pred_1 <- predict(knn_reg_model_1, newdata = test_data)
+knn_MSE_1 <- mean((knn_pred_1 - test_data$medianHouseValue)^2) 
+cat("The KNN MSE is", knn_MSE_1, "\n")
 
 ```
 ### Model Improvements
@@ -189,7 +189,7 @@ test_data_encoded <- as.data.frame(test_data_encoded)
 
 
 
-knn_reg_model2 <- train(
+knn_reg_model_2 <- train(
   medianHouseValue ~ ., 
   data = train_data_encoded,
   method = "knn",
@@ -199,12 +199,12 @@ knn_reg_model2 <- train(
 ) 
 
 # best k 
-print(knn_reg_model2)
+print(knn_reg_model_2)
 
 # KNN MSE calculation 
-knn_pred2 <- predict(knn_reg_model2, newdata = test_data_encoded)
-knn_MSE2 <- mean((knn_pred2 - test_data_encoded$medianHouseValue)^2) 
-cat("The KNN MSE (improved) is", knn_MSE2, "\n")
+knn_pred_2 <- predict(knn_reg_model_2, newdata = test_data_encoded)
+knn_MSE_2 <- mean((knn_pred_2 - test_data_encoded$medianHouseValue)^2) 
+cat("The KNN MSE (improved) is", knn_MSE_2, "\n")
 
 
 #The KNN MSE is 3697939911 with out encoding
@@ -220,15 +220,15 @@ cat("The KNN MSE (improved) is", knn_MSE2, "\n")
 # the split is the same as before 
 
 # train the GAM 
-gam_model <- mgcv::gam(medianHouseValue ~ s(latitude) + s(longitude) + 
+gam_model_1 <- mgcv::gam(medianHouseValue ~ s(latitude) + s(longitude) + 
                    s(housingMedianAge) + s(aveRooms) +
                    s(aveBedrooms) + s(population) +
                    s(medianIncome) + factor(oceanProximity), data = train_data)
 
 # Calculate MSE 
-gam_pred <- predict(gam_model, newdata = test_data)
-gam_MSE <- mean((gam_pred - test_data$medianHouseValue)^2)
-cat("The GAM MSE is", gam_MSE, "\n")
+gam_pred_1 <- predict(gam_model_1, newdata = test_data)
+gam_MSE_1 <- mean((gam_pred_1 - test_data$medianHouseValue)^2)
+cat("The GAM MSE is", gam_MSE_1, "\n")
 
 #4258008383 
 ```
@@ -236,8 +236,8 @@ cat("The GAM MSE is", gam_MSE, "\n")
 ```{r}
 # GAM improvements 
 
-gam.check(gam_model) # 
-summary(gam_model)
+gam.check(gam_model_1) # 
+summary(gam_model_1)
 
 # suspect high corr between longitude and latitude 
  # should add interaction term 
