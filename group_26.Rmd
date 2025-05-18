@@ -234,19 +234,6 @@ cat("The GAM MSE is", gam_MSE_1, "\n")
 #4258008383 
 ```
 
-```{r}
-# GAM improvements 
-
-gam.check(gam_model_1) # 
-summary(gam_model_1)
-
-# suspect high corr between longitude and latitude 
- # should add interaction term 
-plot(data$longitude, data$latitude)
-
-# same thing with aveRooms and aveBedrooms 
-plot(data$aveRooms, data$aveBedrooms)
-```
 ###### some justifications required: 
 
 ```{r}
@@ -290,9 +277,9 @@ cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
 # if any improvements to 2.1.2 occurs and changes the result between KNN and GAM, we need to update the following analysis.
 ```
 
-In this regression problem, even after improvements, the KNN model outperforms the GAM model as shown by its lower test MSE (approximately 3.91 billion versus 4.10 billion). This indicates that KNN better captures the complex, nonlinear relationships in the data.
+In this regression problem, even after improvements, the KNN model outperforms the GAM model as shown by its lower test MSE (approximately 3.00 billion versus 3.34 billion). This indicates that KNN better captures the complex, nonlinear relationships in the data.
 
-KNN does not seem to suffer significantly from the curse of dimensionality here. Its ability to accommodate complex relationships is enhanced by integrating PCA, which effectively reduces bias with only a small increase in variance. This balance allows KNN to generalize well on the test data after tuning the number of neighbors.
+KNN does not appear to suffer from the curse of dimensionality in this case, even with a relatively high number of predictors. After tuning the number of neighbors, the model captures complex relationships in the data without overfitting. Its strong test performance suggests that the added predictors did not harm generalisation.
 
 For the GAM model, attempts to incorporate additional variables (e.g. cityProximityScore) that potentially capture more relevant information have resulted in only marginal improvements in MSE. This suggests that the additive smooth terms in GAM are still too restrictive and unable to fully model the underlying data complexity, limiting its predictive power.
 
@@ -304,27 +291,26 @@ Overall, these results reflect the bias-variance trade-off: KNN achieves lower b
 
 ## 2.2.1 New censoring boolean column
 ```{r}
-# Load original dataset and clean for NA  
-data <- read.csv("Assignt2_data.csv")
+
 
 # Add censoring column and drop id and medianHouseValue
-data <- data %>%
+data_c <- data %>%
   na.omit() %>%
   mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0)) %>%
   dplyr::select(-id, -medianHouseValue) %>%
   mutate(oceanProximity = as.factor(oceanProximity))
 
-# what about this data$censoring <- as.integer(data$medianHouseValue==500001)
+data_c_imp <- data_imp %>%
+  na.omit() %>%
+  mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0)) %>%
+  dplyr::select(-id, -medianHouseValue) %>%
+  mutate(oceanProximity = as.factor(oceanProximity))
+
+
 ```
 
 ## 2.2.2 Two classification methods
-!!!!!!!!!!!!!
-IM NOT TOO SURE HERE! Idk wether to use KNN classification or LDA? cause LDA is only good if n is small and the distribution of the predictor is approximately normal which it isnt most likely
-!!!!!!!!!!!!
 
--- I think LDA and QDA were introduced because they are suitable for non-binary response? 
--- What about TREE and SVM ? 
--- OK maybe not TREE cuz it usually doesnt do well with the predictions 
 
 \noindent \large \textbf{Logistic Regression:} \normalsize
 
@@ -358,17 +344,6 @@ This method is reasonable because:
 # some alternatives to consider: 
 ```
 
-\noindent \large \textbf{Support Vector Machine (SVM)} \normalsize
-
-\begin{enumerate} 
-\item \textbf{Effevtive for high-dimensionality}: Since we have a large amount of features, SVM are suitable due to its kernel approach. 
-\item \textbf{Avoids ovefitting by maximising margin}: SVM focuses on maximizing the margin between the classes (i.e. it tries to be as far away as possible from the closest points in each class (called support vectors)). This reduces the model's sensitivity to small changes in data, which helps the model perform better on unseen data.
-\item \textbf{Accomodating non-linear relationships}: SVMs can be extended to handle complex decision boundaries through the kernel appraoch, allowing modeling of nonlinear relationships.
-
-\noindent \large \textbf{Naïve Bayes} \normalsize
-
-
-
 
 
 
@@ -379,273 +354,223 @@ This method is reasonable because:
 \begin{itemize}
   \item We used a random 80/20 training and test split of the dataset to produce the test error rates.
   \item We dropped the \textit{id} and \textit{medianHouseValue} columns to ensure we only use legitimate predictors when training and testing our     model.
-  \item The logistic model thresholds at $0.5$, while LDA uses its Bayes-rule decision boundary.
+  \item The logistic model thresholds at $0.5$, while KNN makes decisions based on the majority class among the nearest neighbors in the feature space.
 \end{itemize}
 
 ```{r}
 # Logistic Regression
-train_data <- data[train_index, ]
-test_data <- data[-train_index, ] 
+train_data_c <- data_c[train_index, ]
+test_data_c <- data_c[-train_index, ] 
 
-logit_fit <- glm(censoring ~ longitude + 
+logit_fit_1 <- glm(censoring ~ longitude + 
                    latitude + 
                    medianIncome + 
                    housingMedianAge + 
                    oceanProximity + 
                    aveRooms + 
                    aveBedrooms,
-                 data = train_data, 
+                 data = train_data_c, 
                  family = binomial)
 
-logit_pred <- as.numeric(predict(logit_fit, 
-                      newdata = test_data, 
+logit_pred_1 <- as.numeric(predict(logit_fit_1, 
+                      newdata = test_data_c, 
                       type = "response") > 0.5) # use 0.5 for now 
 
-error_rate <- mean(logit_pred != test_data$censoring)
+error_rate <- mean(logit_pred_1 != test_data_c$censoring)
 
 print(paste("Logistic Regression Prediction Error Rate:", round(error_rate, 3)))
 
 #library(caret)
 # Confusion matrix 
-confusion_matrix <- confusionMatrix(as.factor(logit_pred), as.factor(test_data$censoring))
+confusion_matrix <- confusionMatrix(as.factor(logit_pred_1), as.factor(test_data_c$censoring))
 print(confusion_matrix)
 
 # ROC 
 #library(caret)
 #library(pROC)
-logit_pred_probs <- predict(logit_fit, newdata = test_data, type = "response")
-roc_curve <- roc(test_data$censoring, logit_pred_probs)
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+logit_pred_probs_1 <- predict(logit_fit_1, newdata = test_data_c, type = "response")
+roc_curve_1 <- roc(test_data_c$censoring, logit_pred_probs_1)
+plot(roc_curve_1, main = "ROC Curve", col = "blue", lwd = 2)
+# error rate: 0.031
 ```
 
 
+
 ```{r}
-# LDA 
-#library(MASS)
+# Logistic Regression with improvements
+train_data_c_imp <- data_c_imp[train_index, ]
+test_data_c_imp <- data_c_imp[-train_index, ] 
 
-lda_fit <- lda(censoring ~ longitude + 
-                 latitude + 
-                 housingMedianAge + 
-                 aveRooms + 
-                 aveBedrooms + 
-                 population + 
-                 medianIncome + 
-                 oceanProximity, 
-               data = train_data)
+logit_fit_2 <- glm(censoring ~ longitude + 
+                   latitude + 
+                   medianIncome + 
+                   housingMedianAge + 
+                   oceanProximity + 
+                   aveRooms + 
+                   aveBedrooms +
+                   cityProximityScore + 
+                   bedroomsPerRoom + 
+                   incomePerRoom +
+                   distToSF +
+                   distToLA +
+                   cosDirToLA +
+                   cosDirToSF +
+                   sinDirToLA +
+                   sinDirToSF,
+                 data = train_data_c_imp, 
+                 family = binomial)
 
-lda_pred <- predict(lda_fit, test_data)$class 
+logit_pred_2 <- as.numeric(predict(logit_fit_2, 
+                      newdata = test_data_c_imp, 
+                      type = "response") > 0.5) # use 0.5 for now 
+
+error_rate <- mean(logit_pred_2 != test_data_c_imp$censoring)
+
+print(paste("Logistic Regression Prediction Error Rate:", round(error_rate, 3)))
 
 #library(caret)
-confusionMatrix(as.factor(lda_pred), as.factor(test_data$censoring))
+# Confusion matrix 
+confusion_matrix <- confusionMatrix(as.factor(logit_pred_2), as.factor(test_data_c_imp$censoring))
+print(confusion_matrix)
 
-(lda_err = mean(lda_pred != test_data$censoring)) 
-cat("The LDA error rate is", round(lda_err, 4), "\n")
-```
-
-```{r}
-# SVM 
-
-# install.packages("e1071")
-library(e1071)
-train_data <- data[train_index, ] 
-# in case any modification of the data set needed gotta rerun this 
-test_data <- data[-train_index, ]
-
-svm_model_1 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
-                   oceanProximity + aveRooms + aveBedrooms, 
-                 data = train_data, 
-                 kernel = "linear",  # try radial later 
-                 cost = 1,          # Regularization parameter (tune this)
-                 scale = TRUE)      # Standardize the predictors
-
-svm_model_2 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
-                   oceanProximity + aveRooms + aveBedrooms, 
-                 data = train_data, 
-                 kernel = "radial",  
-                 cost = 1,        # Regularization parameter (tune this)
-                 scale = TRUE)  
-
-svm_model_2 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
-                   oceanProximity + aveRooms + aveBedrooms, 
-                 data = train_data, 
-                 kernel = "polynomial",  
-                 cost = 1,        # Regularization parameter (tune this)
-                 scale = TRUE)  
+# ROC 
+#library(caret)
+#library(pROC)
+logit_pred_probs_2 <- predict(logit_fit_2, newdata = test_data_c_imp, type = "response")
+roc_curve_2 <- roc(test_data_c_imp$censoring, logit_pred_probs_2)
+plot(roc_curve_2, main = "ROC Curve", col = "blue", lwd = 2)
+# error rate: 0.029
 ```
 
 
 ```{r}
-svm_fits <- list(
-  "Radial" = svm(censoring ~ 
-                   longitude + latitude + medianIncome + 
-                   housingMedianAge +  aveRooms + aveBedrooms, 
-                 data = data[train_index, ],
-                 kernel = "radial"), 
-  "Polynomial" = svm(censoring ~ 
-                   longitude + latitude + medianIncome + 
-                   housingMedianAge +  aveRooms + aveBedrooms, 
-                 data = data[train_index, ],
-                 kernel = "polynomial", degree = 2), 
-  "Linear" = svm(censoring ~ 
-                   longitude + latitude + medianIncome + 
-                   housingMedianAge + aveRooms + aveBedrooms, 
-                 data = data[train_index, ],
-                 kernel = "linear"))
+## KNN
 
-err <- function(model, data) {
-  out <- table(predict(model, data), data$censoring)
-  (out[1, 2] + out[2, 1]) / sum(out)
+# Prepare the predictors (X) and response (Y)
+train.X <- model.matrix(~ longitude + 
+                          latitude + 
+                          housingMedianAge + 
+                          aveRooms + 
+                          aveBedrooms + 
+                          population + 
+                          medianIncome + 
+                          oceanProximity, 
+                        data = train_data_c)[, -1]
+
+test.X <- model.matrix(~ longitude + 
+                         latitude + 
+                         housingMedianAge + 
+                         aveRooms + 
+                         aveBedrooms + 
+                         population + 
+                         medianIncome + 
+                         oceanProximity, 
+                       data = test_data_c)[, -1]
+
+train.Y <- train_data_c$censoring
+test.Y <- test_data_c$censoring
+
+# Use cross-validation on the training set to choose the best k
+knn_rp <- rep(0, 15)
+for (k in 1:15) {
+  set.seed(5)
+  knn.pred.cv <- knn.cv(train = train.X, cl = train.Y, k = k)
+  knn_rp[k] <- mean(knn.pred.cv == train.Y)
 }
 
-plot(svm_fits[[1]], datap[train_index, ])
-```
+k.cv <- which.max(knn_rp)
+cat("Best k selected by CV is:", k.cv, "\n")
+
+# Fit and predict on the test set using the best k
+set.seed(5)
+knn_pred_c_1 <- knn(train = train.X, test = test.X, cl = train.Y, k = k.cv)
+
+# Compute confusion matrix and error rate
+confusionMatrix(as.factor(knn_pred_c_1), as.factor(test.Y))
+
+(knn_err_c_1 = mean(knn_pred_c_1 != test.Y))
+cat("The KNN error rate is", round(knn_err_c_1, 4), "\n")
 
 
-```{r}
-# Naive Bayes 
-
-nb_fit <- naiveBayes(censoring ~ longitude + 
-                       latitude + 
-                       housingMedianAge + 
-                       aveRooms + 
-                       aveBedrooms + 
-                       population + 
-                       medianIncome, 
-                     data = data[train_index, ])
-
-nb_pred <- predict(nb_fit, data[-train_index, ], type = "class")
-
-# Confusion table 
-(nb_t <- table(nb_pred, data[-train_index, ]$censoring))
-
-(nb_error = 1 - sum(diag(nb_t)) / sum(nb_t))
-cat("The Naive Bayes error rate is", round(nb_error, 4), "\n")
-
-# not doing as good as logistic 
-
-```
-```{r}
-# Alina code
-
-test_data <- data[-train_index, ]
-#QDA
-#fit qda model
-qda_fit <- qda(censoring ~ 
-                 longitude + latitude + medianIncome + 
-                 housingMedianAge + aveRooms + aveBedrooms, 
-               data = data[train_index, ])
-
-#Predict on test data
-qda_pred <- predict(qda_fit, data[-train_index,])$class
-
-# Confusion matrix
-confusionMatrix(as.factor(qda_pred), as.factor(test_data$censoring))
-
-#error rate
-qda_err <- mean(qda_pred != test_data$censoring ) 
-cat("The QDA error rate is", round(qda_err, 4), "\n")
+#The KNN error rate is 0.049 
 
 ```
 
+
+
 ```{r}
-# Alina code
+## KNN with improvements
 
-#wip but 2.2.4 potentially?
+# Prepare the predictors (X) and response (Y)
+train.X <- model.matrix(~ longitude + 
+                          latitude + 
+                          medianIncome + 
+                          housingMedianAge + 
+                          oceanProximity + 
+                          aveRooms + 
+                          aveBedrooms +
+                          cityProximityScore + 
+                          bedroomsPerRoom + 
+                          incomePerRoom +
+                          distToSF +
+                          distToLA +
+                          cosDirToLA +
+                          cosDirToSF +
+                          sinDirToLA +
+                          sinDirToSF, 
+                        data = train_data_c_imp)[, -1]
 
-#decision boundary visualisation
+test.X <- model.matrix(~  longitude + 
+                          latitude + 
+                          medianIncome + 
+                          housingMedianAge + 
+                          oceanProximity + 
+                          aveRooms + 
+                          aveBedrooms +
+                          cityProximityScore + 
+                          bedroomsPerRoom + 
+                          incomePerRoom +
+                          distToSF +
+                          distToLA +
+                          cosDirToLA +
+                          cosDirToSF +
+                          sinDirToLA +
+                          sinDirToSF, 
+                       data = test_data_c_imp)[, -1]
 
-# Compute posterior probs for positive class (censoring == 1)
-grid$lda_post <- predict(lda_fit, grid)$posterior[, "1"]
-grid$qda_post <- predict(qda_fit, grid)$posterior[, "1"]
-grid$nb_post  <- predict(nb_fit, grid, type = "raw")[, "1"]
+train.Y <- train_data_c_imp$censoring
+test.Y <- test_data_c_imp$censoring
 
-library(ggplot2)
-
-ggplot(data, aes(x = longitude, y = latitude)) +
-  geom_point(aes(color = as.factor(censoring)), alpha = 0.5) +
-
-  # Decision boundaries at 0.5 posterior probability - not showing at 0.5
-  geom_contour(data = grid, aes(z = lda_post), breaks = 0.005,
-               color = "black", linetype = "dotted") +
-
-  geom_contour(data = grid, aes(z = qda_post), breaks = 0.006,
-               color = "green", linetype = "solid") +
-
-  geom_contour(data = grid, aes(z = nb_post), breaks = 0.0001,
-               color = "purple", linetype = "dashed") +
-
-  labs(title = "Decision Boundaries: LDA (black), QDA (green), NB/Bayes (purple)",
-       color = "Censoring") +
-  theme_minimal()
-
-#boxplot - compare methods
-library(MASS)
-library(e1071)
-library(caret)
-library(ggplot2)
-
-set.seed(1)
-
-n_reps <- 30
-test_errors <- data.frame(Method = character(), Error = numeric())
-
-for (i in 1:n_reps) {
-  train_idx <- createDataPartition(data$censoring, p = 0.8, list = FALSE)
-  train <- data[train_idx, ]
-  test <- data[-train_idx, ]
-  
-  if (length(unique(train$censoring)) < 2) next
-  
-  # Fit LDA
-  lda_fit <- lda(censoring ~ longitude + latitude + medianIncome + housingMedianAge +
-                 aveRooms + aveBedrooms + population + oceanProximity, data = train)
-  lda_pred <- predict(lda_fit, test)$class
-  lda_err <- mean(lda_pred != test$censoring)
-  
-  # Fit QDA with error handling
-  qda_err <- NA
-  qda_fit <- tryCatch({
-    qda(censoring ~ longitude + latitude + medianIncome + housingMedianAge +
-        aveRooms + aveBedrooms + population + oceanProximity, data = train)
-  }, error = function(e) NULL)
-  
-  if (!is.null(qda_fit)) {
-    qda_pred <- predict(qda_fit, test)$class
-    qda_err <- mean(qda_pred != test$censoring)
-  } else {
-    message(sprintf("QDA failed on iteration %d — skipping", i))
-  }
-  
-  # Fit nb
-  nb_fit <- naiveBayes(censoring ~ longitude + latitude + medianIncome + housingMedianAge +
-                       aveRooms + aveBedrooms + population + oceanProximity, data = train)
-  nb_pred <- predict(nb_fit, test)
-  nb_err <- mean(nb_pred != test$censoring)
-  
-  # Store results only if QDA worked; not sure if bc too many predictors?
-  if (!is.null(qda_fit)) {
-    test_errors <- rbind(test_errors,
-                         data.frame(Method = "LDA", Error = lda_err),
-                         data.frame(Method = "QDA", Error = qda_err),
-                         data.frame(Method = "Naive Bayes", Error = nb_err))
-  } else {
-    # Store only LDA and NB errors
-    test_errors <- rbind(test_errors,
-                         data.frame(Method = "LDA", Error = lda_err),
-                         data.frame(Method = "Naive Bayes", Error = nb_err))
-  }
+# Use cross-validation on the training set to choose the best k
+knn_rp <- rep(0, 15)
+for (k in 1:15) {
+  set.seed(5)
+  knn.pred.cv <- knn.cv(train = train.X, cl = train.Y, k = k)
+  knn_rp[k] <- mean(knn.pred.cv == train.Y)
 }
 
-ggplot(test_errors, aes(x = Method, y = Error, fill = Method)) +
-  geom_boxplot(alpha = 0.7) +
-  labs(title = "Test Error Comparison with QDA Error Handling",
-       y = "Test Error",
-       x = "Method") +
-  theme_minimal() +
-  theme(legend.position = "none")
+k.cv <- which.max(knn_rp)
+cat("Best k selected by CV is:", k.cv, "\n")
+
+# Fit and predict on the test set using the best k
+set.seed(5)
+knn_pred_c_2 <- knn(train = train.X, test = test.X, cl = train.Y, k = k.cv)
+
+# Compute confusion matrix and error rate
+confusionMatrix(as.factor(knn_pred_c_2), as.factor(test.Y))
+
+(knn_err_c_2 = mean(knn_pred_c_2 != test.Y))
+cat("The KNN error rate is", round(knn_err_c_2, 4), "\n")
+
+
+#The KNN error rate is 0.0306 
+
 ```
 
 ## 2.3.4 Justifying the better classification method
+
+
+Need to update
 
 In our 80/20 hold-out test we observed:
 
@@ -684,8 +609,36 @@ Therefore, by this test Logistic Regression performs better than LDA, since it h
 # 2.3 A hybrid approach
 
 ## 2.3.1 Dicussing feasibility of the approach
+Estimate using improved KNN and then apply the censoring from logistic.
+More explanation necessary
 
 ## 2.3.2 test MSE of medianHousingValue using the approach
 
+```{r}
+# Step 1: Predict house prices with KNN regression
+knn_pred_2 <- predict(knn_reg_model_2, newdata = test_data_encoded)
+
+# Step 2: Predict censoring with logistic regression
+logit_pred_2 <- as.numeric(predict(logit_fit_2, newdata = test_data_c_imp, type = "response") > 0.5)
+
+# Step 3: Adjust predicted house prices
+# If censored predicted, clip to 500001
+adjusted_preds <- ifelse(logit_pred_2 == 1, 500001, knn_pred_2)
+
+# Step 4: Compute MSE using all observations
+final_mse <- mean((adjusted_preds - test_data_encoded$medianHouseValue)^2)
+
+cat("Final Test MSE:", round(final_mse, 2), "\n")
+
+
+# Final Test MSE: 3025628814 
+# this is worse then KNN_2
+```
+
 ## 2.3.3 Comparison of the accuracy of this procedure to model in 2.1.3
 
+No test MSE for combined model is worse.
+
+Other note, random test/train sample too. 
+
+The combined model clips predictions to 500001 when the logistic model predicts censoring, but if that prediction is wrong, it forces the value far from the true (uncensored) price, increasing error. KNN, on the other hand, always predicts a value — even for censored cases — and sometimes lands closer to the unknown true price (which is at least 500001), purely by chance. This makes KNN appear to perform better in terms of MSE, even though it doesn't account for censoring and might be underestimating the true values.
