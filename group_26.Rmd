@@ -24,6 +24,7 @@ library(mgcv) # for GAM
 library(MASS) # for LDA 
 library(class) # for KNN
 library(geosphere)
+library(pROC)
 ```
 
 # 2.1 Nonlinear model vs non-parametric model
@@ -303,13 +304,15 @@ Overall, these results reflect the bias-variance trade-off: KNN achieves lower b
 
 ## 2.2.1 New censoring boolean column
 ```{r}
-# Load original dataset and clean for NA
+# Load original dataset and clean for NA  
 data <- read.csv("Assignt2_data.csv")
-data <- na.omit(data)
 
-# Make a new column "censoring" where 1 if medianHouseValue=500,001; and 0 otherwise
+# Add censoring column and drop id and medianHouseValue
 data <- data %>%
-  mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0))
+  na.omit() %>%
+  mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0)) %>%
+  dplyr::select(-id, -medianHouseValue) %>%
+  mutate(oceanProximity = as.factor(oceanProximity))
 
 # what about this data$censoring <- as.integer(data$medianHouseValue==500001)
 ```
@@ -372,9 +375,15 @@ This method is reasonable because:
 
 ## 2.2.3 Which classification method performs better?
 
-```{r}
-# Logistic Regression 
+\textbf{How we have used the given data:}
+\begin{itemize}
+  \item We used a random 80/20 training and test split of the dataset to produce the test error rates.
+  \item We dropped the \textit{id} and \textit{medianHouseValue} columns to ensure we only use legitimate predictors when training and testing our     model.
+  \item The logistic model thresholds at $0.5$, while LDA uses its Bayes-rule decision boundary.
+\end{itemize}
 
+```{r}
+# Logistic Regression
 train_data <- data[train_index, ]
 test_data <- data[-train_index, ] 
 
@@ -396,16 +405,14 @@ error_rate <- mean(logit_pred != test_data$censoring)
 
 print(paste("Logistic Regression Prediction Error Rate:", round(error_rate, 3)))
 
-library(caret)
+#library(caret)
 # Confusion matrix 
 confusion_matrix <- confusionMatrix(as.factor(logit_pred), as.factor(test_data$censoring))
 print(confusion_matrix)
 
 # ROC 
-# install.packages("caret")
-library(caret)
-# install.packages("pROC")
-library(pROC)
+#library(caret)
+#library(pROC)
 logit_pred_probs <- predict(logit_fit, newdata = test_data, type = "response")
 roc_curve <- roc(test_data$censoring, logit_pred_probs)
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
@@ -414,7 +421,7 @@ plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 
 ```{r}
 # LDA 
-# library(MASS)
+#library(MASS)
 
 lda_fit <- lda(censoring ~ longitude + 
                  latitude + 
@@ -428,7 +435,7 @@ lda_fit <- lda(censoring ~ longitude +
 
 lda_pred <- predict(lda_fit, test_data)$class 
 
-# library(caret)
+#library(caret)
 confusionMatrix(as.factor(lda_pred), as.factor(test_data$censoring))
 
 (lda_err = mean(lda_pred != test_data$censoring)) 
@@ -461,7 +468,7 @@ svm_model_2 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedi
 svm_model_2 <- svm(censoring ~ longitude + latitude + medianIncome + housingMedianAge + 
                    oceanProximity + aveRooms + aveBedrooms, 
                  data = train_data, 
-                 kernel = "polinomial",  
+                 kernel = "polynomial",  
                  cost = 1,        # Regularization parameter (tune this)
                  scale = TRUE)  
 ```
@@ -517,7 +524,162 @@ cat("The Naive Bayes error rate is", round(nb_error, 4), "\n")
 # not doing as good as logistic 
 
 ```
+```{r}
+# Alina code
 
+test_data <- data[-train_index, ]
+#QDA
+#fit qda model
+qda_fit <- qda(censoring ~ 
+                 longitude + latitude + medianIncome + 
+                 housingMedianAge + aveRooms + aveBedrooms, 
+               data = data[train_index, ])
+
+#Predict on test data
+qda_pred <- predict(qda_fit, data[-train_index,])$class
+
+# Confusion matrix
+confusionMatrix(as.factor(qda_pred), as.factor(test_data$censoring))
+
+#error rate
+qda_err <- mean(qda_pred != test_data$censoring ) 
+cat("The QDA error rate is", round(qda_err, 4), "\n")
+
+```
+
+```{r}
+# Alina code
+
+#wip but 2.2.4 potentially?
+
+#decision boundary visualisation
+
+# Compute posterior probs for positive class (censoring == 1)
+grid$lda_post <- predict(lda_fit, grid)$posterior[, "1"]
+grid$qda_post <- predict(qda_fit, grid)$posterior[, "1"]
+grid$nb_post  <- predict(nb_fit, grid, type = "raw")[, "1"]
+
+library(ggplot2)
+
+ggplot(data, aes(x = longitude, y = latitude)) +
+  geom_point(aes(color = as.factor(censoring)), alpha = 0.5) +
+
+  # Decision boundaries at 0.5 posterior probability - not showing at 0.5
+  geom_contour(data = grid, aes(z = lda_post), breaks = 0.005,
+               color = "black", linetype = "dotted") +
+
+  geom_contour(data = grid, aes(z = qda_post), breaks = 0.006,
+               color = "green", linetype = "solid") +
+
+  geom_contour(data = grid, aes(z = nb_post), breaks = 0.0001,
+               color = "purple", linetype = "dashed") +
+
+  labs(title = "Decision Boundaries: LDA (black), QDA (green), NB/Bayes (purple)",
+       color = "Censoring") +
+  theme_minimal()
+
+#boxplot - compare methods
+library(MASS)
+library(e1071)
+library(caret)
+library(ggplot2)
+
+set.seed(1)
+
+n_reps <- 30
+test_errors <- data.frame(Method = character(), Error = numeric())
+
+for (i in 1:n_reps) {
+  train_idx <- createDataPartition(data$censoring, p = 0.8, list = FALSE)
+  train <- data[train_idx, ]
+  test <- data[-train_idx, ]
+  
+  if (length(unique(train$censoring)) < 2) next
+  
+  # Fit LDA
+  lda_fit <- lda(censoring ~ longitude + latitude + medianIncome + housingMedianAge +
+                 aveRooms + aveBedrooms + population + oceanProximity, data = train)
+  lda_pred <- predict(lda_fit, test)$class
+  lda_err <- mean(lda_pred != test$censoring)
+  
+  # Fit QDA with error handling
+  qda_err <- NA
+  qda_fit <- tryCatch({
+    qda(censoring ~ longitude + latitude + medianIncome + housingMedianAge +
+        aveRooms + aveBedrooms + population + oceanProximity, data = train)
+  }, error = function(e) NULL)
+  
+  if (!is.null(qda_fit)) {
+    qda_pred <- predict(qda_fit, test)$class
+    qda_err <- mean(qda_pred != test$censoring)
+  } else {
+    message(sprintf("QDA failed on iteration %d — skipping", i))
+  }
+  
+  # Fit nb
+  nb_fit <- naiveBayes(censoring ~ longitude + latitude + medianIncome + housingMedianAge +
+                       aveRooms + aveBedrooms + population + oceanProximity, data = train)
+  nb_pred <- predict(nb_fit, test)
+  nb_err <- mean(nb_pred != test$censoring)
+  
+  # Store results only if QDA worked; not sure if bc too many predictors?
+  if (!is.null(qda_fit)) {
+    test_errors <- rbind(test_errors,
+                         data.frame(Method = "LDA", Error = lda_err),
+                         data.frame(Method = "QDA", Error = qda_err),
+                         data.frame(Method = "Naive Bayes", Error = nb_err))
+  } else {
+    # Store only LDA and NB errors
+    test_errors <- rbind(test_errors,
+                         data.frame(Method = "LDA", Error = lda_err),
+                         data.frame(Method = "Naive Bayes", Error = nb_err))
+  }
+}
+
+ggplot(test_errors, aes(x = Method, y = Error, fill = Method)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Test Error Comparison with QDA Error Handling",
+       y = "Test Error",
+       x = "Method") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## 2.3.4 Justifying the better classification method
+
+In our 80/20 hold-out test we observed:
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{l c}
+\hline
+\textbf{Model}            & \textbf{Misclassification Rate} \\ 
+\hline
+Logistic Regression       & 0.0310                          \\
+Linear Discriminant Analysis (LDA) & 0.0343                          \\
+\hline
+\end{tabular}
+\caption{Test-set misclassification rates for Logistic Regression and LDA.}
+\label{tab:misclass}
+\end{table}
+
+Therefore, by this test Logistic Regression performs better than LDA, since it has the lower test error rate.
+
+\textbf{Reasoning:}
+\begin{enumerate}
+  \item Bias
+  \begin{itemize}
+    \item Logistic regression only makes one structural assumption: that the log-odds of censoring is a linear function of the predictors. Also there is only 
+  \end{itemize}
+  \item Variance
+  \begin{itemize}
+    \item
+  \end{itemize}
+  \item Trade-off
+  \begin{itemize}
+    \item
+  \end{itemize}
+\end{enumerate}
 
 # 2.3 A hybrid approach
 
