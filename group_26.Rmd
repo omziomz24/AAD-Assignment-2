@@ -268,10 +268,6 @@ cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
 
 ## 2.1.3 Which model performs better?
 
-```{r}
-# if any improvements to 2.1.2 occurs and changes the result between KNN and GAM, we need to update the following analysis.
-```
-
 In this regression problem, even after improvements, the KNN model outperforms the GAM model as shown by its lower test MSE (approximately 3.00 billion versus 3.34 billion). This indicates that KNN better captures the complex, nonlinear relationships in the data.
 
 KNN does not appear to suffer from the curse of dimensionality in this case, even with a relatively high number of predictors. After tuning the number of neighbors, the model captures complex relationships in the data without overfitting. Its strong test performance suggests that the added predictors did not harm generalisation.
