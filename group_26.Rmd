@@ -80,7 +80,7 @@ library(pROC)
 
 
 
-We will use the cleaned data (omitting all data point that contains "NA") instead of the original raw dataset. We split the data into a training set (80% of the original data) and a test set. 
+We will use the cleaned data (omitting all data point that contains "NA") instead of the original raw dataset. We split the data into a training set (80% of the original data) and a test set (20% of the original data). 
 
 ```{r}
 # load the data 
@@ -119,6 +119,7 @@ knn_MSE_1 <- mean((knn_pred_1 - test_data$medianHouseValue)^2)
 cat("The KNN MSE is", knn_MSE_1, "\n")
 # The KNN MSE is 3697939911 
 ```
+
 ### Model Improvements
 
 ```{r}
@@ -236,7 +237,7 @@ cat("The GAM MSE is", gam_MSE_1, "\n")
 ###### some justifications required: 
 
 ```{r}
-# improvements
+# GAM improvements
 train_data_imp = data_imp[train_index, ]
 gam_model_2 <- mgcv::gam(medianHouseValue ~ 
                      s(housingMedianAge) + 
