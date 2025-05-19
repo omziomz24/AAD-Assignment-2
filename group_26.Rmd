@@ -1,11 +1,14 @@
 ---
 title: "Group-26 AAD-Assignment-2"
 author: "Omar, Eloise, Alina, Sue"
-
 date: "`r Sys.Date()`"
-  html_document:
+output:
+  pdf_document:
     toc: true
     toc_depth: '4'
+  html_document:
+    toc: true
+    toc_depth: 4
     df_print: paged
 ---
 
@@ -72,13 +75,7 @@ library(pROC)
   \item \textbf{KNN:} can capture complex interactions, between predictors, automatically, but with eight predictors (including a categorical     one)   it may run into high-dimensionality issues, making distance-based averaging unstable and slow.
 \end{itemize} 
 
-
-
-
-
 ## 2.1.2 GAM vs KNN Regression Model
-
-
 
 We will use the cleaned data (omitting all data point that contains "NA") instead of the original raw dataset. We split the data into a training set (80% of the original data) and a test set (20% of the original data). 
 
@@ -86,21 +83,23 @@ We will use the cleaned data (omitting all data point that contains "NA") instea
 # load the data 
 data <- read.csv("Assignt2_data.csv")
 data <- na.omit(data)
-# View(data)
 ```
 
-
 ```{r}
-# separate the train and test set out 
+# separate the training and test set out 
 set.seed(1)
 train_index <- createDataPartition(data$medianHouseValue, p = 0.8, list = FALSE)
 train_data <- data[train_index, ]
 test_data  <- data[-train_index, ]
 ```
 
+### Basic KNN Regression Model 
 
-```{r}
+The basic KNN regression model was trained using 5-fold cross-validation on the training dataset, with k tuned from 1 to 10. Preprocessing steps included centering and scaling to ensure features contribute equally to the distance metric.
+
+```{r} 
 # Basic KNN
+
 knn_reg_model_1 <- train(
   medianHouseValue ~ ., 
   data = train_data,
@@ -116,13 +115,14 @@ print(knn_reg_model_1)
 # KNN MSE calculation 
 knn_pred_1 <- predict(knn_reg_model_1, newdata = test_data)
 knn_MSE_1 <- mean((knn_pred_1 - test_data$medianHouseValue)^2) 
-cat("The KNN MSE is", knn_MSE_1, "\n")
+cat("The test MSE of basic KNN model is", knn_MSE_1, "\n")
 
 # The KNN MSE is 3697939911 
 
 ```
+The test MSE of basic KNN model is 3,697,939,911 
 
-### Model Improvements
+### KNN Model Improvements
 
 ```{r}
 # Using the predictors from Asmt1 ? 
@@ -165,16 +165,10 @@ data_imp$cityProximityScore <- 1 / (1 + data_imp$distToLA) + 1 / (1 + data_imp$d
 # Add these to test and train
 train_data_imp <- data_imp[train_index, ]
 test_data_imp  <- data_imp[-train_index, ]
-
-
-
-
 ```
 
-
-
 ```{r}
-# with model improvements
+# KNN with model improvements
 # Hot encoding the variables
 
 # Convert oceanProximity to factor (if not already)
@@ -217,7 +211,7 @@ cat("The KNN MSE (improved) is", knn_MSE_2, "\n")
 # best now is: 2999761722 
 ```
 
-
+### Basic GAM 
 ```{r}
 # GAM 
 # the split is the same as before 
@@ -236,6 +230,7 @@ cat("The GAM MSE is", gam_MSE_1, "\n")
 #4258008383 
 ```
 
+### GAM Improvements 
 ###### some justifications required: 
 
 ```{r}
