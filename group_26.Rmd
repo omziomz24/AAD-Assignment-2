@@ -268,8 +268,6 @@ cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
 #3386284239 
 ```
 
-# END SUE CODE 
-
 
 ## 2.1.3 Which model performs better?
 
@@ -300,6 +298,8 @@ data_c <- data %>%
   dplyr::select(-id, -medianHouseValue) %>%
   mutate(oceanProximity = as.factor(oceanProximity))
 
+
+# This dataframe does the same changes as above but is with our model improvements
 data_c_imp <- data_imp %>%
   na.omit() %>%
   mutate(censoring = ifelse(medianHouseValue == 500001, 1, 0)) %>%
@@ -311,33 +311,38 @@ data_c_imp <- data_imp %>%
 
 ## 2.2.2 Two classification methods
 
-
 \noindent \large \textbf{Logistic Regression:} \normalsize
 
-\noindent In this case logistic regression can model the log-odds of hitting the $\$500,001$ cap (censoring $= 1$) as a linear function of the predictors:
+\noindent In this case logistic regression can model the log-odds of hitting the $\$500,001$ cap (censoring $= 1$) as a linear function of the predictors: \vspace{-1em}
 
-$$\log \frac{\mathbb{P}(\text{censor} = 1 | X)}{1 - \mathbb{P}(\text{censor} = 1 | X)} = \beta_{0} + \beta_{1} \ \text{medianIncome} + \beta_{2} \ \text{housingMedianAge} + ...$$ 
+$$\log \frac{Pr(\text{censor} = 1 | X_1,...,X_p)}{1 - Pr(\text{censor} = 1 | X_1,...,X_p)} = \beta_{0} + \beta_{1} \ \text{medianIncome} + \beta_{2} \ \text{housingMedianAge} + ...$$ 
 This method is reasonable because:
 \begin{enumerate}
-  \item \textbf{Ideal for binary classification problems}: Designed specifically for binary response variables, logistic regression is suitable since in this case censoring take values of either $1$ (censored) or $0$ (not censored). 
-  \item \textbf{Handles mixed feature types:} This method works with our continuous predictor and categorical predictors (oceanProximity)
-  \item \textbf{No strong distributional assumptions on }$\boldsymbol{X}:$\textbf{:} Some of our variables may be skewed or heteroskedastic; logistic   regression simply cares that the logit is linear in $X$, not that $X | Y$ is normal.
-  \item \textbf{Interpretable effects:} e.g. $e^{\beta_{1}}$ tells us how one unit ($\$1,000$) increases in medianIncome multiplies the odds of a      house price being censored.
-  \item \textbf{Flexibility}: It estimates the probability that a given input belongs to a particular class, which also provides us with the flexibility of choosing the threshold for which optimises the testing correct rate with the assistance of ROC table.
+  \item \textbf{Ideal for binary classification problems}: Designed specifically for binary response variables, logistic regression is suitable since in this case censoring take values of either $1$ (censored) or $0$ (not censored).
+  \item \textbf{No strong distributional assumptions on }$\boldsymbol{X}$: Some of our variables may be skewed or heteroskedastic; logistic   regression simply cares that the logit is linear in $\boldsymbol{X}$ (where $\boldsymbol{X} = (X_1, ..., X_p)$).
+  \item \textbf{Interpretable effects}: e.g. $e^{\beta_{1}}$ tells us how one unit ($\$1,000$) increases in medianIncome multiplies the odds of a      house price being censored.
+  \item \textbf{Flexibility}: It estimates the probability that a given input belongs to a particular class, which also provides us with the flexibility of choosing the threshold for which optimises the testing correct rate with the assistance of the ROC curve.
 \end{enumerate}
 
 
-\noindent \large \textbf{Linear Discriminant Analysis (LDA):} \normalsize
+\noindent \large \textbf{KNN-CV:} \normalsize
 
-\noindent In this case LDA assumes that, within each class (censor $= 0$ or $1$), the vector of predictors $($medianIncome,housingMedianAge,...$)^\top$ is drawn from a multivariate Normal with class-specific mean $\mu_{k}$ but a common covariance $\boldsymbol{\Sigma}$. It then classifies via the linear discriminant:
+\noindent In this case KNN-CV is a non-parametric approach that classifies each block group by majority voting among its $k$ closest neighbours in the predictor space. Formally, for a test point $x_0$, let $N_0$ be the indices of the $k$ nearest training observations (by Euclidean distance):
 
-$$\delta_k(x) = x^T \boldsymbol{\Sigma^{-1}} \mu_k - \frac{1}{2} \mu_k^T \boldsymbol{\Sigma^{-1}} \mu_k + \log \pi_k$$
-\noindent assigning each $x$ to a class with the largest $\delta_{k}$ 
+$$Pr(\text{censor} = 1|x_0) = \frac{1}{k}\sum_{i\in N_0}I(\text{censor}_i = 1)$$
 
-This method is reasonable because:
+\noindent and we predict the class with the larger estimated probability. We choose $k$ via cross-validation to pick the optimal bias-variance trade-off. \\
+
+\noindent This method is reasonable because:
 \begin{enumerate}
-  \item \textbf{Captures covariance structure:} between some of the variables there is correlation (e.g. high-income also tends to have more bedrooms   )\textendash and that joint pattern differs between censored vs uncensored data\textenddash LDA leverages those correlations in a single rule.
-  \item \textbf{Transparent boundary:} 
+  \item \textbf{Captures nonlinearity}: If censoring depends on complex interactions and requires a non-linear decision boundary, KNN can adapt without specifying a specific model form.
+  \item \textbf{No parametric assumptions}: No distributional assumptions required--so it's robust to skewed, heteroskedastic variables.
+  \item \textbf{Tunable bias-variance trade-off via cross-validation}: The ability to choose $k$ allows us to control the smoothness.
+    \begin{itemize}
+        \item Small $k \implies$ very flexible (low bias, high variance)
+        \item Large $k \implies$ smoother (high bias, low variance)
+        \item Using cross-validation empirically estimates the error for each $k$, letting us pick a $k$ value the minimises both over and under fitting
+    \end{itemize}
 \end{enumerate}
 
 ```{r}
@@ -354,11 +359,11 @@ This method is reasonable because:
 \begin{itemize}
   \item We used a random 80/20 training and test split of the dataset to produce the test error rates.
   \item We dropped the \textit{id} and \textit{medianHouseValue} columns to ensure we only use legitimate predictors when training and testing our     model.
-  \item The logistic model thresholds at $0.5$, while KNN makes decisions based on the majority class among the nearest neighbors in the feature space.
+  \item The logistic model thresholds at $0.5$, while KNN makes decisions based on the majority class among the nearest neighbours in the feature      space.
 \end{itemize}
 
 ```{r}
-# Logistic Regression
+# Logistic Regression without Model Improvements
 train_data_c <- data_c[train_index, ]
 test_data_c <- data_c[-train_index, ] 
 
@@ -397,7 +402,7 @@ plot(roc_curve_1, main = "ROC Curve", col = "blue", lwd = 2)
 
 
 ```{r}
-# Logistic Regression with improvements
+# Logistic Regression with Model Improvements
 train_data_c_imp <- data_c_imp[train_index, ]
 test_data_c_imp <- data_c_imp[-train_index, ] 
 
@@ -444,7 +449,7 @@ plot(roc_curve_2, main = "ROC Curve", col = "blue", lwd = 2)
 
 
 ```{r}
-## KNN
+## KNN-CV Without Model Improvements
 
 # Prepare the predictors (X) and response (Y)
 train.X <- model.matrix(~ longitude + 
@@ -496,10 +501,8 @@ cat("The KNN error rate is", round(knn_err_c_1, 4), "\n")
 
 ```
 
-
-
 ```{r}
-## KNN with improvements
+## KNN-CV with Model Improvements
 
 # Prepare the predictors (X) and response (Y)
 train.X <- model.matrix(~ longitude + 
@@ -569,42 +572,10 @@ cat("The KNN error rate is", round(knn_err_c_2, 4), "\n")
 
 ## 2.3.4 Justifying the better classification method
 
-
-Need to update
-
 In our 80/20 hold-out test we observed:
 
-\begin{table}[ht]
-\centering
-\begin{tabular}{l c}
-\hline
-\textbf{Model}            & \textbf{Misclassification Rate} \\ 
-\hline
-Logistic Regression       & 0.0310                          \\
-Linear Discriminant Analysis (LDA) & 0.0343                          \\
-\hline
-\end{tabular}
-\caption{Test-set misclassification rates for Logistic Regression and LDA.}
-\label{tab:misclass}
-\end{table}
+- Alina justification here
 
-Therefore, by this test Logistic Regression performs better than LDA, since it has the lower test error rate.
-
-\textbf{Reasoning:}
-\begin{enumerate}
-  \item Bias
-  \begin{itemize}
-    \item Logistic regression only makes one structural assumption: that the log-odds of censoring is a linear function of the predictors. Also there is only 
-  \end{itemize}
-  \item Variance
-  \begin{itemize}
-    \item
-  \end{itemize}
-  \item Trade-off
-  \begin{itemize}
-    \item
-  \end{itemize}
-\end{enumerate}
 
 # 2.3 A hybrid approach
 
