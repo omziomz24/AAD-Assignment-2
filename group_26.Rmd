@@ -100,14 +100,15 @@ test_data  <- data[-train_index, ]
 
 
 ```{r}
+set.seed(1)
 # Basic KNN
 knn_reg_model_1 <- train(
   medianHouseValue ~ ., 
   data = train_data,
   method = "knn",
   preProcess = c("center", "scale"),
-  tuneGrid = data.frame(k = 1:10),  # test k = 1 to 10
-  trControl = trainControl(method = "cv", number = 5) 
+  tuneGrid = data.frame(k = 1:15), #try k from 1 to 15 for k=11 OR can just keep as k=1:10 and then up it in improvmenet
+  trControl = trainControl(method = "cv", number = 5)
 ) 
 
 # best k 
@@ -118,6 +119,15 @@ knn_pred_1 <- predict(knn_reg_model_1, newdata = test_data)
 knn_MSE_1 <- mean((knn_pred_1 - test_data$medianHouseValue)^2) 
 cat("The KNN MSE is", knn_MSE_1, "\n")
 
+#alina tests; trying tunelegnth and tunegrid up to diff ranges
+# tuneGrid = data.frame(k = 1:10), to test k = 1 to 10 -> MSE is 3697939911 for k=10
+# tuneGrid = data.frame(k = 1:15) -> MSE is 3678088721 for k=11
+# tuneGrid = data.frame(k = 1:20) -> MSE is 3678088721 for optimal k=11
+# tuneGrid = data.frame(k = 1:200) -> MSE is 3678088721 k = 11
+#tunelength = 10 -> k=9, MSE = 3700907285 
+#tunelength=15 -> MSE is 3700907285 , k=9
+#tunelength=20 -> MSE is 3700907285, k=9
+# tunelength=200-> 3700907285 k=9
 ```
 ### Model Improvements
 
@@ -172,47 +182,81 @@ test_data_imp  <- data_imp[-train_index, ]
 
 
 ```{r}
-# with model improvements
+# with model improvements - ALINA experimenting with PCA at diff thresholds; still doesnt make it better 
 # Hot encoding the variables
 
 # Convert oceanProximity to factor (if not already)
 train_data_imp$oceanProximity <- as.factor(train_data_imp$oceanProximity)
 test_data_imp$oceanProximity <- as.factor(test_data_imp$oceanProximity)
 
-# One-hot encode using dummyVars
+# One-hot encode using dummyVars; dummyVars() designs how to encode categorical predictors while predict() function applies the one-hot encoding transformation to the data 
 dummies <- dummyVars(~ ., data = train_data_imp)
 train_data_encoded <- predict(dummies, newdata = train_data_imp)
 test_data_encoded <- predict(dummies, newdata = test_data_imp)
 
 # Convert to data frame
 train_data_encoded <- as.data.frame(train_data_encoded)
-test_data_encoded <- as.data.frame(test_data_encoded)
+test_data_encoded <- as.data.frame(test_data_encoded) 
 
+#ALINA TEST PCA: preProc <- preProcess(df[, -ncol(df)], method = c("pca"), thresh = 0.9)
 
+# Assume df is your dataset, and the last column is the target
+features <- train_data_encoded[, -c(ncol(train_data_encoded) - 14, ncol(train_data_encoded))]  # predictors
+target <- train_data_encoded[, ncol(train_data_encoded) - 14]  
+test_features <- test_data_encoded[, -c(ncol(test_data_encoded) - 14, ncol(test_data_encoded))]  # drop target & extra col
+test_target <- test_data_encoded[, ncol(test_data_encoded) - 14]
+
+# Step 1: Preprocess manually with PCA
+pre_proc <- preProcess(features, method = c("center", "scale", "pca"), thresh = 0.95)
+
+# Step 2: Apply PCA transformation
+pca_features <- predict(pre_proc, features)
+test_pca_features <- predict(pre_proc, test_features)
+
+# Step 3: Combine PCA features and target
+train_data_encoded_pca <- data.frame(pca_features, medianHouseValue = target)
+test_data_encoded_pca <- data.frame(test_pca_features, medianHouseValue = test_target)
+
+# Step 4: Train model using transformed data
+set.seed(1)
 
 knn_reg_model_2 <- train(
   medianHouseValue ~ ., 
-  data = train_data_encoded,
+  data = train_data_encoded_pca,
   method = "knn",
-  preProcess = c("center", "scale"),
-  tuneGrid = data.frame(k = 1:15),  # test k = 1 to 15
-  trControl = trainControl(method = "cv", number = 5) 
+  tuneGrid = data.frame(k = 1:15),
+  trControl = trainControl(method = "cv", number = 5)
 ) 
 
 # best k 
 print(knn_reg_model_2)
 
 # KNN MSE calculation 
-knn_pred_2 <- predict(knn_reg_model_2, newdata = test_data_encoded)
-knn_MSE_2 <- mean((knn_pred_2 - test_data_encoded$medianHouseValue)^2) 
+knn_pred_2 <- predict(knn_reg_model_2, newdata = test_data_encoded_pca)
+knn_MSE_2 <- mean((knn_pred_2 - test_data_encoded_pca$medianHouseValue)^2) 
 cat("The KNN MSE (improved) is", knn_MSE_2, "\n")
 
-
+#BEFORE:
 #The KNN MSE is 3697939911 with out encoding
 #With encoding  3694531899
 #PCA makes it worse in general
 #improve when tested more k 3650562433
 # best now is: 2999761722 
+
+#AFTER - testing higher range of k:
+#The KNN MSE is 3678088721 with out encoding for k=11 when testing k up to 15
+#With encoding 2965091742 and testing up to 15 still; lower because the model now compares categorical features correctly and it finds more relevant neighbors, so the predictions get closer to the true values.
+
+#alina test; no pca below:
+#tunelength=10 -> 3200650347 for k=9, dont do tunelength - less control
+#tuneGrid = data.frame(k = 1:15) -> MSE (improved) is 2965091742 , k = 8 i think 15 is fine if we did 15 or 10 before
+#tuneGrid = data.frame(k = 1:20) -> MSE (improved) is 2965091742 , k=8
+
+#alina test; with pca below and trying k=1:15:
+#0.9 -> 3319385292 , k = 10
+#0.6 -> 3478478737, k=15
+#0.95 -> 3321507308 , k = 12
+#explanation for why PCA not improving: PCA might not improve KNN regression’s MSE because it can discard important low-variance features or distort distances that KNN relies on. Also, if your data is low-dimensional or relationships are nonlinear, PCA’s linear reduction may remove useful information instead of helping.
 ```
 
 
@@ -570,11 +614,43 @@ cat("The KNN error rate is", round(knn_err_c_2, 4), "\n")
 
 ```
 
-## 2.3.4 Justifying the better classification method
+## 2.2.4 Justifying the better classification method
 
-In our 80/20 hold-out test we observed:
+In our 80/20 hold-out test we observed...
 
-- Alina justification here
+- model structure reason:
+
+Logistic regression outperformed KNN-CV largely due to the characteristics of our dataset and modelling approach -- namely the high-dimensionality of our data and the risk of overparametrisation with other models. Logistic regression often performs well for high-dimensional problems since it has the tendency to produce lower variance at the cost of higher bias, due to its linear decision boundary. In other words, it generalizes well and avoids overfitting, especially when the number of predictors is large.
+
+Methods like KNN are low-bias and high-variance, which offers flexibility but may become increasingly unstable in high dimensional-spaces where data points become more sparsely distributed and neighbourhoods become less informative. Specifically, the difference between the nearest and farthest point from any given point tends to shrink in higher dimensions, which makes it hard to distinguish between what is considered a 'close' and 'far' neighbour. The curse of dimensionality means models like KNN can overfit the training data which increases variance and deteriorates test performance.
+
+Logistic regression ultimately performed best in terms of achieving the lower test error. This suggests that the bias introduced by the linear assumption was outweighed by the benefit of lower variance, striking a good balance in the bias-variance tradeoff compared to other methods. 
+
+
+- No ROC justification: 
+
+We did not produce an ROC curve for KNN classifiers because standard KNN outputs hard class labels (0 or 1) rather than a continuous probability or score. Therefore, because ROC curves require a range of scores to test different thresholds and KNN doesn’t produce these, it cannot be plotted directly. 
+
+It should be noted that modifications can be made to produce class probabilities from KNN, but this extra step would be unecessary given classification is our primary objective and doing so would not improve accuracy.
+
+*Below maybe leave out of dicussion but optional to include*
+
+- linearity reason (probs not the right reason?):
+
+Logistic regression outperformed KNN-CV. This can be explained by the bias-variance trade-off, where we observe the tendency for logistic regression to underfit (ie. produce lower variance with higher bias) due to its linear decision boundary. 
+
+On the other hand, KNN-CV offers a non-parametric alternative that can adapt to more complex or non-linear relationships in the data. KNN tends to have low bias and high variance, especially with small values of k, which can lead to overfitting. Despite cross-validation used to select the best k, the true relationship between predictors and the outcome is approximately linear, so logistic regression outperformed KNN  after tuning, because its simplicity reduced the risk of overfitting.
+
+
+- from lecture..
+When the true decision boundary (PLOT on 2 axis?) is close to linear and normality is absent, LR tends to work better. T
+
+KNN-CV tends to outperform when the true decision boundary is very non-linear and when normality assumption is not met. 
+
+- Comparing other methods not presented:
+LDA also works well when the decision boundary is approximately linear, but relies on the normality assumption, hence it was not considered.
+QDA deteriorates considerably as a result of non-normality.
+
 
 
 # 2.3 A hybrid approach
