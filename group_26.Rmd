@@ -41,9 +41,9 @@ library(pROC)
 
 \noindent \textbf{Pros}
 \begin{itemize}
-  \item \textbf{Flexibility to capture non-linearity}. In a GAMM we replace each linear term $\beta_{k} x_{k}$ with a smooth function $f_{k}(x_{k})$,     meaning we can automatically model non-linear relationships between each predictor and the response without having to manually try out different      transformation on each variable individually.
+  \item \textbf{Flexibility to capture non-linearity}. In a GAM we replace each linear term $\beta_{k} x_{k}$ with a smooth function $f_{k}(x_{k})$,     meaning we can automatically model non-linear relationships between each predictor and the response without having to manually try out different      transformation on each variable individually.
   \item \textbf{Non-linear fits may be more accurate}. The ability of creating this non-linear predictor and response relationship may make our model     more accurate when predicting the medianHousingValue.
-  \item \textbf{Interperability from additivity}. Since a GAMM is additive, we can examine the effect of each $X_j$ on $Y$ individually while holding      all of the other variables fixed. Therefore, we can understand each variables individual effect on house value.
+  \item \textbf{Interperability from additivity}. Since a GAM is additive, we can examine the effect of each $X_j$ on $Y$ individually while holding      all of the other variables fixed. Therefore, we can understand each variables individual effect on house value.
   \item \textbf{Control over smoothness}. Each $f_j$ comes with an associated smoothing parameter (or degrees of freedom), making it straightforward      to trade bias and variance  (e.g. via cross-validation).
 \end{itemize}
 
@@ -71,7 +71,7 @@ library(pROC)
 
 \noindent \large \textbf{In this housing-price context: } \normalsize
 \begin{itemize}
-  \item \textbf{GAMM:} it is likely to give an interpretable model with, as we can analyse the partial-effects (e.g. how median income or ocean         proximity individually affects price), and we can capture smooth non-linear trends.
+  \item \textbf{GAM:} it is likely to give an interpretable model with, as we can analyse the partial-effects (e.g. how median income or ocean         proximity individually affects price), and we can capture smooth non-linear trends.
   \item \textbf{KNN:} can capture complex interactions, between predictors, automatically, but with eight predictors (including a categorical     one)   it may run into high-dimensionality issues, making distance-based averaging unstable and slow.
 \end{itemize} 
 
@@ -719,6 +719,15 @@ cat("Final Test MSE using probability-weighted prediction:", round(final_mse_ver
 
 The modified hybrid model has a slightly lower MSE (2,975,741,318) compared to the KNN regression model from 2.1.3 (2,999,761,722). This improvement can be attributed to how the probability-weighted method handles uncertainty near the censoring boundary. Instead of applying a hard classification rule (i.e., clipping to 500,001 when the probability of censoring exceeds 0.5), this method uses a soft probabilistic adjustment. This approach acts like an expected value under uncertainty, allowing smoother transitions near the threshold.
 
-However, this 0.8% decrease is not significant. It may fall within the range of random variation due to the specific train-test split or model variability. While the probabilistic adjustment offers a more refined treatment of censoring, the overall improvement is marginal, suggesting that both approaches perform similarly in practice. 
+However, this 0.8% decrease is not significant. It may fall within the range of random variation due to the specific train-test split or model variability. While the probabilistic adjustment offers a more refined treatment of censoring, the overall improvement is marginal, suggesting that both approaches perform similarly in practice.
+
+
+
+
+What if we apply outer-cv to compare: 
+```{r}
+
+```
+
 
 
