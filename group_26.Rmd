@@ -318,7 +318,7 @@ $$\log \frac{Pr(\text{censor} = 1 | X_1,...,X_p)}{1 - Pr(\text{censor} = 1 | X_1
 This method is reasonable because:
 \begin{enumerate}
   \item \textbf{Ideal for binary classification problems}: Designed specifically for binary response variables, logistic regression is suitable since in this case censoring take values of either $1$ (censored) or $0$ (not censored).
-  \item \textbf{No strong distributional assumptions on }$\boldsymbol{X}$: Some of our variables may be skewed or heteroskedastic; logistic   regression simply cares that the logit is linear in $\boldsymbol{X}$ (where $\boldsymbol{X} = (X_1, ..., X_p)$).
+  \item \textbf{No strong distributional assumptions on }$\boldsymbol{X}$: Some of our variables may be skewed or heteroscedastic; logistic   regression simply cares that the logit is linear in $\boldsymbol{X}$ (where $\boldsymbol{X} = (X_1, ..., X_p)$).
   \item \textbf{Interpretable effects}: e.g. $e^{\beta_{1}}$ tells us how one unit ($\$1,000$) increases in medianIncome multiplies the odds of a      house price being censored.
   \item \textbf{Flexibility}: It estimates the probability that a given input belongs to a particular class, which also provides us with the flexibility of choosing the threshold for which optimises the testing correct rate with the assistance of the ROC curve.
 \end{enumerate}
@@ -563,11 +563,16 @@ cat("The KNN error rate is", round(knn_err_c_2, 4), "\n")
 
 ```
 
-## 2.3.4 Justifying the better classification method
+Note: We did not generate ROC curves for KNN because it does not provide continuous probability scores but rather hard class labels. ROC analysis requires varying the classification threshold across a range of values, which is not possible with the standard KNN output. While probabilistic adaptations of KNN exist, they were not necessary here since our objective was classification accuracy, not probability estimation.
 
-In our 80/20 hold-out test we observed:
+## 2.2.4 Justifying the better classification method
 
-- Alina justification here
+Logistic regression outperformed KNN-CV in our 80/20 hold-out test, with test errors of 0.0290 and 0.0306 respectively. Logistic regression is a parametric model, it assumes a specific relationship between predictors and the target, resulting in higher bias but lower variance. This rigidity works in its favour when the underlying structure of the data is close to linear, as it avoids fitting noise and reduces the risk of overfitting. KNN, on the other hand, is non-parametric and makes very few assumptions about the data’s form. It is flexible and can capture complex, non-linear patterns, but that flexibility comes at the cost of high variance, especially in high-dimensional settings.
+
+While KNN’s flexibility can be useful, it becomes increasingly unstable in high-dimensional spaces where data points are more sparsely distributed and neighbourhoods lose their meaning. Specifically, the distance between the nearest and farthest neighbours shrinks, making it hard to define what counts as “close,” which undermines the core logic of KNN. Even with cross-validation to choose the optimal k, KNN was still overfitting, likely due to this dimensionality issue. Logistic regression, despite its linear constraint, handled the complexity of the data more gracefully by not reacting too much to the noise.
+
+The lower test error achieved by logistic regression shows that its higher bias was actually beneficial here, it provided a smoother, more stable model that generalised well. So while KNN theoretically offers more flexibility, in this case it became a liability, and logistic regression ultimately struck the better balance. To note, the test error is only marginally larger for the KNN, and both are relatively low so it is clear that both models are effective, just for this random seed logistic regression is the winner.
+
 
 
 # 2.3 A hybrid approach
