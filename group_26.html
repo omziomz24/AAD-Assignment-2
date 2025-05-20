@@ -1751,13 +1751,12 @@ cat(&quot;The test MSE of basic KNN model is&quot;, knn_MSE_1, &quot;\n&quot;)</
 </div>
 <div id="knn-model-improvements" class="section level3">
 <h3>KNN Model Improvements</h3>
-<pre class="r"><code># Using the predictors from Asmt1 ? 
+<pre class="r"><code># import and clean data to get data_imp for model improvement 
 data_imp &lt;- read.csv(&quot;Assignt2_data.csv&quot;)
 data_imp &lt;- na.omit(data_imp)
 
 # bedroomsPerRoom
 data_imp$bedroomsPerRoom &lt;- data_imp$aveBedrooms / data_imp$aveRooms
-
 
 # incomePerRoom
 data_imp$incomePerRoom = data_imp$medianIncome / data_imp$aveRooms
@@ -1791,7 +1790,8 @@ data_imp$cityProximityScore &lt;- 1 / (1 + data_imp$distToLA) + 1 / (1 + data_im
 # Add these to test and train
 train_data_imp &lt;- data_imp[train_index, ]
 test_data_imp  &lt;- data_imp[-train_index, ]</code></pre>
-<pre class="r"><code># KNN with model improvements
+<pre class="r"><code># KNN with model improvements cont. 
+
 # Hot encoding the variables
 
 # Convert oceanProximity to factor (if not already)
@@ -1863,10 +1863,9 @@ cat(&quot;The KNN MSE (improved) is&quot;, knn_MSE_2, &quot;\n&quot;)</code></pr
 <div id="basic-gam" class="section level3">
 <h3>Basic GAM</h3>
 <pre class="r"><code># GAM 
-# the split is the same as before 
 
 # train the GAM 
-set.seed(1) # automatic tuning due to automatic tuning (slect = TRUE) 
+set.seed(1)
 gam_model_1 &lt;- mgcv::gam(medianHouseValue ~ s(latitude) + 
                            s(longitude) + 
                    s(housingMedianAge) + 
@@ -1887,21 +1886,9 @@ cat(&quot;The Basic GAM MSE is&quot;, gam_MSE_1, &quot;\n&quot;)</code></pre>
 </div>
 <div id="improved-gam" class="section level3">
 <h3>Improved GAM</h3>
-<p>The tensor product, te(longitude, latitude), smooth for longitude and
-latitude helps model complex spatial patterns, while automatic term
-selection reduces overfitting.</p>
-<p>The improved GAM model incorporates new features such as city
-proximity scores, distances, and directional terms to better capture
-spatial and socioeconomic effects.</p>
-<p>Automatic term selection in the GAM model is achieved by applying a
-penalty to each smooth term using select = TRUE, which allows the model
-to shrink irrelevant terms toward zero and effectively remove them,
-thereby reducing overfitting. We do not manually specify degrees of
-freedom to let the model adaptively determine the optimal level of
-smoothing for each term based on the data.</p>
 <pre class="r"><code># GAM improvements
 train_data_imp = data_imp[train_index, ]
-set.seed(1) # automatic tuning due to select = TRUE
+set.seed(1) 
 gam_model_2 &lt;- mgcv::gam(medianHouseValue ~ 
                      s(housingMedianAge) + 
                      s(aveRooms) +
@@ -1919,7 +1906,7 @@ gam_model_2 &lt;- mgcv::gam(medianHouseValue ~
                      s(sinDirToLA) +
                      s(sinDirToSF),  
                    data = train_data_imp,
-                   select = TRUE) # to reduce overfitting 
+                   select = TRUE)  
 
 
 # Calculate MSE 
@@ -1934,43 +1921,28 @@ cat(&quot;The GAM MSE (improved) is&quot;, gam_MSE_2, &quot;\n&quot;)</code></pr
 <div id="which-model-performs-better" class="section level2">
 <h2>2.1.3 Which model performs better?</h2>
 <p>Without adding any new features, KNN regression has a lower test MSE
-(3,697,939,911) than the GAM (test MSE = 4,257,370,057). The models were
-tuned - KNN with 5-fold cross-validation to select the optimal k, and
-GAM with automatic smoothing parameter selection.</p>
-<p>As mentioned in</p>
-<p>With the improvements of new predictors, the KNN model still
-outperforms the GAM based on their test MSEs (approximately
-2,999,761,722 vs. 3,386,284,239), indicating that KNN Regression better
-captures the complex nonlinear relationships in the data. Despite the
-relatively high number of predictors, KNN does not suffer noticeably
-from the curse of dimensionality here, and tuning the parameter k
-(number of neighbors) allows it to balance flexibility and overfitting
-effectively.</p>
-<p>In contrast, the GAM model, even with added smooth terms and
-interaction effects, only achieves marginal improvements. This suggests
-that the additive smooth assumptions in GAM may be too restrictive to
-fully capture the underlying data complexity, limiting its predictive
-power.</p>
-<p>Overall, these results reflect the bias-variance trade-off: KNN
-reduces bias through flexible local fitting, while GAM’s smoother
-additive structure imposes higher bias, which constrains its performance
-despite typically lower variance.</p>
-<p>In the context of the housing data, KNN’s flexibility allows it to
-capture complex, localized patterns—such as variations in house prices
-influenced by neighborhood characteristics or geographic proximity—that
-may not follow smooth or additive trends. This reduces bias, enabling
-KNN to model the intricate nonlinear relationships more accurately.
-Although KNN can be sensitive to noise (variance), tuning the number of
-neighbors helps balance this. On the other hand, GAM’s additive smooth
-terms impose a more global, constrained structure on the data, which
-reduces variance and stabilizes predictions but introduces bias by
-oversimplifying the relationships. Despite adding interaction terms like
-tensor smooths and new predictors, GAM struggles to fully capture sharp
-local variations in housing prices, limiting its improvement. Thus, the
-bias-variance trade-off explains why KNN’s greater flexibility yields
-lower test error on this complex housing dataset, while GAM’s smoother
-but more restrictive form leads to higher bias and slightly worse
-performance.</p>
+(3,697,939,911) that is about 13% lower than the GAM (test MSE =
+4,257,370,057). The baseline models were tuned - KNN with 5-fold
+cross-validation to select the optimal k, and GAM with automatic feature
+selection.</p>
+<p>After introducing additional features and encoding the categorical
+variables, the KNN model’s MSE dropped substantially by about 19% (to
+2,999,761,722). The MSE for GAM also reduced by 20% (to 3,386,284,239).
+However, the KNN model still outperforms the GAM by a 11.4% lower
+MSE.</p>
+<p>KNN outperforms GAM both before and after the model improvements
+because its completely non-parametric nature that “makes no assumptions
+about the functional form” and averages responses of nearest neighbors
+(recall section 2.1.1 KNN Pros). This flexibility allows it to capture
+complex interactions introduced by new features such as
+cityProximityScore and the directional terms.</p>
+<p>On the other hand, GAM is limited by its additive structure and
+smoothing assumptions, which “restrict its ability to capture strong
+synergistic effects” unless interactions are explicitly modeled (section
+2.1.1 GAM Cons). Additionally, GAM’s exponential family assumption
+(Gaussian here) on the response variable limits its flexibility to fully
+model complex, censored, and non-normal housing price data, making it
+less suitable compared to nonparametric models like KNN.</p>
 </div>
 </div>
 <div id="classification-models" class="section level1">
