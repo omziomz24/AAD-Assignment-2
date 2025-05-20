@@ -3,13 +3,13 @@ title: "Group-26 AAD-Assignment-2"
 author: "Omar, Eloise, Alina, Sue"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    toc: true
-    toc_depth: '4'
   html_document:
     toc: true
     toc_depth: 4
     df_print: paged
+  pdf_document:
+    toc: true
+    toc_depth: '4'
 ---
 
 ```{r setup, include=FALSE}
@@ -124,14 +124,39 @@ The test MSE of basic KNN model is 3,697,939,911
 
 ### KNN Model Improvements
 
+\begin{itemize}*{Addition and modification of features:}
+
+  \item Following the arguments in Assignment1, we've added the following features to the KNN regression model: 
+  \begin{itemize}
+    \item \textbf{bedroomsPerRoom}: captures housing density within units; higher ratios may indicate crowding, which could affect property value.
+    \item \textbf{incomePerRoom}: reflects economic status relative to housing size, providing a measure of affordability or wealth.
+    \item \textbf{distToLA} and \textbf{distToSF}: quantify proximity to major cities, which often correlates with higher housing prices.
+    \item \textbf{cosDirToLA/SF} and \textbf{sinDirToLA/SF}: encode directional information relative to LA and SF to help KNN detect spatial orientation patterns.
+    \item \textbf{cityProximityScore}: combines distance to both cities into a single metric, giving higher scores to locations near either city.
+  \end{itemize}
+  
+  \item We also encoded the categorical data to numeric form so KNN can properly use it for distance calculations
+  \begin{itemize}
+    \item Converted the categorical variable \texttt{oceanProximity} to a factor to ensure proper handling of categories.
+    \item Applied one-hot encoding using \texttt{dummyVars()} to convert categorical variables into binary indicator variables.
+    \item Transformed the one-hot encoded matrices back into data frames for compatibility with modeling functions.
+  \end{itemize}
+  
+\end{itemize}
+
+\begin{itemize}*{How we used the data:}
+  \item The k-NN regression model was trained using the encoded and preprocessed training data (`train_data_encoded`), which includes both numeric and one-hot encoded categorical variables.
+  \item We standardized features by centering and scaling (`preProcess = c("center", "scale")`) to ensure that distance calculations are not affected by different sizes of units.
+  \item We selected best `k` by performing cross validation (5-fold) over the range 1 to 15 (`tuneGrid = data.frame(k = 1:15)`).
+\end{itemize}
+
 ```{r}
-# Using the predictors from Asmt1 ? 
+# import and clean data to get data_imp for model improvement 
 data_imp <- read.csv("Assignt2_data.csv")
 data_imp <- na.omit(data_imp)
 
 # bedroomsPerRoom
 data_imp$bedroomsPerRoom <- data_imp$aveBedrooms / data_imp$aveRooms
-
 
 # incomePerRoom
 data_imp$incomePerRoom = data_imp$medianIncome / data_imp$aveRooms
@@ -168,7 +193,8 @@ test_data_imp  <- data_imp[-train_index, ]
 ```
 
 ```{r}
-# KNN with model improvements
+# KNN with model improvements cont. 
+
 # Hot encoding the variables
 
 # Convert oceanProximity to factor (if not already)
@@ -185,7 +211,7 @@ train_data_encoded <- as.data.frame(train_data_encoded)
 test_data_encoded <- as.data.frame(test_data_encoded)
 
 
-
+set.seed(1)
 knn_reg_model_2 <- train(
   medianHouseValue ~ ., 
   data = train_data_encoded,
@@ -203,7 +229,6 @@ knn_pred_2 <- predict(knn_reg_model_2, newdata = test_data_encoded)
 knn_MSE_2 <- mean((knn_pred_2 - test_data_encoded$medianHouseValue)^2) 
 cat("The KNN MSE (improved) is", knn_MSE_2, "\n")
 
-
 #The KNN MSE is 3697939911 with out encoding
 #With encoding  3694531899
 #PCA makes it worse in general
@@ -212,30 +237,49 @@ cat("The KNN MSE (improved) is", knn_MSE_2, "\n")
 ```
 
 ### Basic GAM 
+
+\begin{itemize}
+  \item We used the same 80/20 train-test split as before to ensure consistency. 
+  \item The GAM model was trained using smoothing splines on original predictors to capture possible non-linear relationships. 
+  \item The select = TRUE argument enables automatic feature selection by penalising and shrinking irrelevant smooth terms toward zero. This is analogous to tuning the hyperparameter k in the Basic KNN regression, as both mechanisms helps to control model complexity and prevent overfitting.
+\end{itemize}
+
+
 ```{r}
 # GAM 
-# the split is the same as before 
 
 # train the GAM 
-gam_model_1 <- mgcv::gam(medianHouseValue ~ s(latitude) + s(longitude) + 
-                   s(housingMedianAge) + s(aveRooms) +
-                   s(aveBedrooms) + s(population) +
-                   s(medianIncome) + factor(oceanProximity), data = train_data)
+set.seed(1)
+gam_model_1 <- mgcv::gam(medianHouseValue ~ s(latitude) + 
+                           s(longitude) + 
+                   s(housingMedianAge) + 
+                     s(aveRooms) +
+                   s(aveBedrooms) + 
+                     s(population) +
+                   s(medianIncome) + 
+                     factor(oceanProximity), 
+                   data = train_data, 
+                   select = TRUE)
 
 # Calculate MSE 
 gam_pred_1 <- predict(gam_model_1, newdata = test_data)
 gam_MSE_1 <- mean((gam_pred_1 - test_data$medianHouseValue)^2)
-cat("The GAM MSE is", gam_MSE_1, "\n")
+cat("The Basic GAM MSE is", gam_MSE_1, "\n")
 
-#4258008383 
+# 4257370057 
 ```
 
-### GAM Improvements 
-###### some justifications required: 
+### Improved GAM  
+
+\begin{itemize}
+  \item Similar to the improved KNN Regression, the improved GAM model incorporates new features such as city proximity scores, distances, and directional terms to better capture spatial and socioeconomic effects. 
+  \item We also included a tensor product smooth, te(longitude, latitude), to flexibly capture complex spatial interactions between longitude and latitude.
+\end{itemize}
 
 ```{r}
 # GAM improvements
 train_data_imp = data_imp[train_index, ]
+set.seed(1) 
 gam_model_2 <- mgcv::gam(medianHouseValue ~ 
                      s(housingMedianAge) + 
                      s(aveRooms) +
@@ -253,7 +297,7 @@ gam_model_2 <- mgcv::gam(medianHouseValue ~
                      s(sinDirToLA) +
                      s(sinDirToSF),  
                    data = train_data_imp,
-                   select = TRUE) # to reduce overfitting 
+                   select = TRUE)  
 
 
 # Calculate MSE 
@@ -262,19 +306,19 @@ gam_pred_2 <- predict(gam_model_2, newdata = test_data_imp)
 gam_MSE_2 <- mean((gam_pred_2 - test_data_imp$medianHouseValue)^2)
 cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
 
-#3386284239 
+# 3386501790 
 ```
 
 
 ## 2.1.3 Which model performs better?
 
-In this regression problem, even after improvements, the KNN model outperforms the GAM model as shown by its lower test MSE (approximately 3.00 billion versus 3.34 billion). This indicates that KNN better captures the complex, nonlinear relationships in the data.
+Without adding any new features, KNN regression has a lower test MSE (3,697,939,911) that is about 13% lower than the GAM (test MSE = 4,257,370,057). The baseline models were tuned - KNN with 5-fold cross-validation to select the optimal k, and GAM with automatic feature selection.
 
-KNN does not appear to suffer from the curse of dimensionality in this case, even with a relatively high number of predictors. After tuning the number of neighbors, the model captures complex relationships in the data without overfitting. Its strong test performance suggests that the added predictors did not harm generalisation.
+After introducing additional features and encoding the categorical variables, the KNN model’s MSE dropped substantially by about 19% (to 2,999,761,722). The MSE for GAM also reduced by 20% (to 3,386,284,239). However, the KNN model still outperforms the GAM by a 11.4% lower MSE. 
 
-For the GAM model, attempts to incorporate additional variables (e.g. cityProximityScore) that potentially capture more relevant information have resulted in only marginal improvements in MSE. This suggests that the additive smooth terms in GAM are still too restrictive and unable to fully model the underlying data complexity, limiting its predictive power.
+KNN outperforms GAM both before and after the model improvements because its completely non-parametric nature that “makes no assumptions about the functional form” and averages responses of nearest neighbors (recall section 2.1.1 KNN Pros). This flexibility allows it to capture complex interactions introduced by new features such as cityProximityScore and the directional terms. 
 
-Overall, these results reflect the bias-variance trade-off: KNN achieves lower bias through flexible local fitting and dimensionality reduction, while GAM’s higher bias—due to its smoother additive assumptions—limits its performance despite generally lower variance.
+On the other hand, GAM is limited by its additive structure and smoothing assumptions, which “restrict its ability to capture strong synergistic effects” unless interactions are explicitly modeled (section 2.1.1 GAM Cons). Additionally, GAM's exponential family assumption (Gaussian here) on the response variable limits its flexibility to fully model complex, censored, and non-normal housing price data, making it less suitable compared to nonparametric models like KNN.
 
 
 
@@ -668,7 +712,4 @@ The hybrid model resulted in a slightly lower test MSE (2,997,065,945)
 The hybrid model resulted in a slightly higher test MSE (3,025,628,814) compared to the original KNN regression model from 2.1.3 (2,999,761,722). These results were obtained using a random 80/20 train-test split of the data the same split used throughout the course of this report. Given how close the two MSE values are, it's possible that on a different random sample, the hybrid model could perform slightly better. Overall, the difference is minimal, suggesting that both models offer comparable predictive performance in this context.
 
 The reason the hybrid model does not consistently outperform KNN likely stems from how it handles censoring using a hard classification decision. Specifically, it clips predicted values to 500001 whenever the logistic classifier predicts an observation is censored. This is because logistic regression applies a strict decision boundary (at 0.5) to make this call, which introduces a sharp threshold with no gradual transition. This can be problematic near the boundary, where small changes in input may flip the classification, yet the model treats the output as definitively censored or not. If the classifier incorrectly predicts censoring, the hard cap forces the prediction to 500001, which can be significantly off from the true (uncensored) value. In contrast, the KNN model always outputs a continuous estimate. When the classifier misclassifies an uncensored point as censored, the true value is often still closer to the KNN prediction than to the fixed 500001. As a result, KNN may show better MSE performance, despite not explicitly addressing censoring.
-<<<<<<< HEAD
 
-=======
->>>>>>> main
