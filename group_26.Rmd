@@ -3,13 +3,13 @@ title: "Group-26 AAD-Assignment-2"
 author: "Omar, Eloise, Alina, Sue"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: '4'
   html_document:
     toc: true
     toc_depth: 4
     df_print: paged
-  pdf_document:
-    toc: true
-    toc_depth: '4'
 ---
 
 ```{r setup, include=FALSE}
@@ -48,30 +48,30 @@ library(pROC)
 
 \noindent \textbf{Cons}
 \begin{itemize}
-  \item \textbf{Additivity assumption restriction}. If there are strong synergistic effects like between location (longitude/latitude) and income         \textendash an additive model will not capture them unless explicit interaction terms $X_j \times X_k$ are included or low-dimensional               interactions function of the form $f_{jk}(X_j, X_k)$ are manually introduced. 
-  \item \textbf{Computational cost}. Fitting this model to over \textasciitilde$20,600$ observations and multiple smoothers can be very slow when        compared to fitting a single parametric method.
+  \item \textbf{Additivity assumption restriction}. If there are strong synergistic effects like between location (longitude/latitude) and income \textendash an additive model will not capture them unless explicit interaction terms $X_j \times X_k$ are included or low-dimensional               interactions function of the form $f_{jk}(X_j, X_k)$ are manually introduced. 
+  \item \textbf{Computational cost}. Fitting this model to over \textasciitilde$20,600$ observations and multiple smoothers can be very slow when compared to fitting a single parametric method.
 \end{itemize}
 
 \noindent \large \textbf{KNN:} \normalsize
 
 \noindent \textbf{Pros}
 \begin{itemize}
-  \item \textbf{Completely non-parametric}. KNN makes no assumptions about the form of $f(X)$, allowing the model to potentially fit better than a      parametric model. At a point $x_0$ KNN averages the responses of the $K$ closest training blocks: $\hat{f}(x_{0}) = \frac{1}{K} \sum_{x_{i}           \in N_{0}}{y_i}$, where $N_0$ is the set of the $K$ nearest neighbours.
-  \item \textbf{Control of bias-variance}. A small $K$ yields a very flexible, low-bias but high-variance fit; large $K$ yields a smoother,      lower-variance fit.
+  \item \textbf{Completely non-parametric}. KNN makes no assumptions about the form of $f(X)$, allowing the model to potentially fit better than a parametric model. At a point $x_0$ KNN averages the responses of the $K$ closest training blocks: $\hat{f}(x_{0}) = \frac{1}{K} \sum_{x_{i}           \in N_{0}}{y_i}$, where $N_0$ is the set of the $K$ nearest neighbours.
+  \item \textbf{Control of bias-variance}. A small $K$ yields a very flexible, low-bias but high-variance fit; large $K$ yields a smoother, lower-variance fit.
 \end{itemize}
 
 \noindent \textbf{Cons}
 \begin{itemize}
-  \item \textbf{Dimensoniality constraints}. As the number of predictors grows, the "nearest" neighbours tend to be far away in a high-dimensional       space, so KNN's performance degrades rapidly as the number of predictors grow.
-  \item \textbf{Distance metric sensitivity}. With a KNN you must scale the numeric features and encode the categorical features (e.g.                  oceanProximity) carefully. Otherwise poorly scaled or encoded features can dominate the distance of the nearest neighbours calculation.
-  \item \textbf{Computationally intensive with predictions}. For each new group of predictions all \textasciitilde$20,600$ must be computed to find     the $K$ nearest, which can be very intensive and slow.
+  \item \textbf{Dimensoniality constraints}. As the number of predictors grows, the "nearest" neighbours tend to be far away in a high-dimensional space, so KNN's performance degrades rapidly as the number of predictors grow.
+  \item \textbf{Distance metric sensitivity}. With a KNN you must scale the numeric features and encode the categorical features (e.g. oceanProximity) carefully. Otherwise poorly scaled or encoded features can dominate the distance of the nearest neighbours calculation.
+  \item \textbf{Computationally intensive with predictions}. For each new group of predictions all \textasciitilde$20,600$ must be computed to find the $K$ nearest, which can be very intensive and slow.
   \item \textbf{Low interperability}. There is no simple way to explain a KNN prediction beyond pointing to the raw neighbours and their average.
 \end{itemize}
 
 \noindent \large \textbf{In this housing-price context: } \normalsize
 \begin{itemize}
-  \item \textbf{GAM:} it is likely to give an interpretable model with, as we can analyse the partial-effects (e.g. how median income or ocean         proximity individually affects price), and we can capture smooth non-linear trends.
-  \item \textbf{KNN:} can capture complex interactions, between predictors, automatically, but with eight predictors (including a categorical     one)   it may run into high-dimensionality issues, making distance-based averaging unstable and slow.
+  \item \textbf{GAM:} it is likely to give an interpretable model with, as we can analyse the partial-effects (e.g. how median income or ocean proximity individually affects price), and we can capture smooth non-linear trends.
+  \item \textbf{KNN:} can capture complex interactions, between predictors, automatically, but with eight predictors (including a categorical one) it may run into high-dimensionality issues, making distance-based averaging unstable and slow.
 \end{itemize} 
 
 ## 2.1.2 GAM vs KNN Regression Model
@@ -121,12 +121,12 @@ cat("The test MSE of basic KNN model is", knn_MSE_1, "\n")
 
 ```
 
-
 ### KNN Model Improvements
 
-\begin{itemize}*{Addition and modification of features:}
+Addition and modification of features:
 
-  \item Following the arguments in Assignment1, we've added the following features to the KNN regression model: 
+\begin{itemize}
+  \item Following the arguments in Assignment1, we've added the following features to the KNN regression model:
   \begin{itemize}
     \item \textbf{bedroomsPerRoom}: captures housing density within units; higher ratios may indicate crowding, which could affect property value.
     \item \textbf{incomePerRoom}: reflects economic status relative to housing size, providing a measure of affordability or wealth.
@@ -134,21 +134,23 @@ cat("The test MSE of basic KNN model is", knn_MSE_1, "\n")
     \item \textbf{cosDirToLA/SF} and \textbf{sinDirToLA/SF}: encode directional information relative to LA and SF to help KNN detect spatial orientation patterns.
     \item \textbf{cityProximityScore}: combines distance to both cities into a single metric, giving higher scores to locations near either city.
   \end{itemize}
-  
-  \item We also encoded the categorical data to numeric form specifically for KNN so it can properly use it for distance calculations
+
+  \item We also encoded the categorical data to numeric form specifically for KNN so it can properly use it for distance calculations.
   \begin{itemize}
     \item Converted the categorical variable \texttt{oceanProximity} to a factor to ensure proper handling of categories.
     \item Applied one-hot encoding using \texttt{dummyVars()} to convert categorical variables into binary indicator variables.
     \item Transformed the one-hot encoded matrices back into data frames for compatibility with modeling functions.
   \end{itemize}
-  
 \end{itemize}
 
-\begin{itemize}*{How we used the data:}
-  \item The KNN regression model was trained using the encoded and preprocessed training data (`train_data_encoded`), which includes both numeric and one-hot encoded categorical variables.
-  \item We standardized features by centering and scaling (`preProcess = c("center", "scale")`) to ensure that distance calculations are not affected by different sizes of units.
-  \item We selected best `k` by performing cross validation (5-fold) over the range 1 to 15 (`tuneGrid = data.frame(k = 1:15)`).
+How we used the data:
+
+\begin{itemize}
+  \item The KNN regression model was trained using the encoded and preprocessed training data (\texttt{train\_data\_encoded}), which includes both numeric and one-hot encoded categorical variables.
+  \item We standardized features by centering and scaling (\texttt{preProcess = c("center", "scale")}) to ensure that distance calculations are not affected by different sizes of units.
+  \item We selected the best \texttt{k} by performing cross validation (5-fold) over the range 1 to 15 (\texttt{tuneGrid = data.frame(k = 1:15)}).
 \end{itemize}
+
 
 ```{r}
 # Import and clean data to get data_imp for model improvement 
