@@ -605,6 +605,7 @@ cat("The KNN error rate is", round(knn_err_c_2, 4), "\n")
 
 ```
 
+Note: We did not generate ROC curves for KNN because it does not provide continuous probability scores but rather hard class labels. ROC analysis requires varying the classification threshold across a range of values, which is not possible with the standard KNN output. While probabilistic adaptations of KNN exist, they were not necessary here since our objective was classification accuracy, not probability estimation.
 
 
 ## 2.2.4 Justifying the better classification method
