@@ -117,7 +117,6 @@ print(knn_reg_model_1)
 knn_pred_1 <- predict(knn_reg_model_1, newdata = test_data)
 knn_MSE_1 <- mean((knn_pred_1 - test_data$medianHouseValue)^2) 
 cat("The test MSE of basic KNN model is", knn_MSE_1, "\n")
-#3983322872 
 
 ```
 
@@ -233,8 +232,6 @@ knn_pred_2 <- predict(knn_reg_model_2, newdata = test_data_encoded)
 knn_MSE_2 <- mean((knn_pred_2 - test_data_encoded$medianHouseValue)^2) 
 cat("The KNN MSE (improved) is", knn_MSE_2, "\n")
 
-
-# best now is: 3060856986 
 ```
 
 ### Basic GAM 
@@ -267,8 +264,6 @@ gam_pred_1 <- predict(gam_model_1, newdata = test_data)
 gam_MSE_1 <- mean((gam_pred_1 - test_data$medianHouseValue)^2)
 cat("The Basic GAM MSE is", gam_MSE_1, "\n")
 
-# 4257370057 
-# The Basic GAM MSE is 4256244455 
 ```
 
 ### Improved GAM  
@@ -308,16 +303,15 @@ gam_pred_2 <- predict(gam_model_2, newdata = test_data_imp)
 gam_MSE_2 <- mean((gam_pred_2 - test_data_imp$medianHouseValue)^2)
 cat("The GAM MSE (improved) is", gam_MSE_2, "\n")
 
-# 3386501790 
-# The GAM MSE (improved) is 3386284239 
+
 ```
 
 
 ## 2.1.3 Which model performs better?
 
-Without adding any new features, KNN regression has a lower test MSE (3.98 billion) that is about 7% lower than the GAM (test MSE = 4.26). The baseline models were tuned - KNN with 5-fold cross-validation to select the optimal k, and GAM with automatic feature selection.
+Without adding any new features, KNN regression has a lower test MSE (3.98 billion) that is about 7% lower than the GAM (test MSE = 4.26 billion). The baseline models were tuned - KNN with 5-fold cross-validation to select the optimal k, and GAM with automatic feature selection.
 
-After introducing additional features and encoding the categorical variables, the KNN model’s MSE dropped substantially by about 22% (to 3.06 billion). The MSE for GAM also reduced by 22% (to 3.34 billion). However, the KNN model still outperforms the GAM by a 8% lower test MSE. 
+After introducing additional features and encoding the categorical variables, the KNN model’s MSE dropped substantially by about 23% (to 3.06 billion). The MSE for GAM also reduced by 20% (to 3.39 billion). However, the KNN model still outperforms the GAM by a 10% lower test MSE. 
 
 KNN outperforms GAM both before and after the model improvements because its completely non-parametric nature that makes no assumptions about the functional form and averages responses of nearest neighbours (recall section 2.1.1 KNN Pros). This flexibility allows it to capture complex interactions introduced by new features such as cityProximityScore and the directional terms. 
 
@@ -433,7 +427,6 @@ print(confusion_matrix)
 logit_pred_probs_1 <- predict(logit_fit_1, newdata = test_data_c, type = "response")
 roc_curve_1 <- roc(test_data_c$censoring, logit_pred_probs_1)
 plot(roc_curve_1, main = "ROC Curve", col = "blue", lwd = 2)
-# error rate: 0.031
 ```
 
 
@@ -479,7 +472,6 @@ print(confusion_matrix)
 logit_pred_probs_2 <- predict(logit_fit_2, newdata = test_data_c_imp, type = "response")
 roc_curve_2 <- roc(test_data_c_imp$censoring, logit_pred_probs_2)
 plot(roc_curve_2, main = "ROC Curve", col = "blue", lwd = 2)
-# error rate: 0.029
 ```
 
 
@@ -532,8 +524,6 @@ confusionMatrix(as.factor(knn_pred_c_1), as.factor(test.Y))
 (knn_err_c_1 = mean(knn_pred_c_1 != test.Y))
 cat("The KNN error rate is", round(knn_err_c_1, 4), "\n")
 
-
-#The KNN error rate is 0.049 
 
 ```
 
@@ -603,7 +593,6 @@ confusionMatrix(as.factor(knn_pred_c_2), as.factor(test.Y))
 cat("The KNN error rate is", round(knn_err_c_2, 4), "\n")
 
 
-#The KNN error rate is 0.0306 
 
 ```
 
@@ -648,7 +637,6 @@ final_mse <- mean((adjusted_preds - test_data_encoded$medianHouseValue)^2)
 cat("Final Test MSE:", round(final_mse, 2), "\n")
 
 
-# Final Test MSE: 3077760238  
 ```
 
 ## 2.3.3 Comparison of the accuracy of this procedure to model in 2.1.3
